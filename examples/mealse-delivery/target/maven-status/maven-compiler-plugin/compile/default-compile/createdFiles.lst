@@ -1,0 +1,11 @@
+com/example/mealse/ch03/ValidOrderPlanForm.class
+com/example/mealse/domain/OrderPlan$PremiumPlan.class
+com/example/mealse/ch04/OrderPlanDecoder.class
+com/example/mealse/ch03/OrderPlanForm.class
+com/example/mealse/domain/MealId.class
+com/example/mealse/domain/DeliveryFrequency.class
+com/example/mealse/domain/MealSetId.class
+com/example/mealse/ch03/OrderPlanFormValidator.class
+com/example/mealse/domain/OrderPlan$StandardPlan.class
+com/example/mealse/domain/OrderPlan$CustomPlan.class
+com/example/mealse/domain/OrderPlan.class
