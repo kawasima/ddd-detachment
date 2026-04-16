@@ -4,13 +4,13 @@ title: "既存コードへの導入"
 
 ## 全面書き換えは必要ない
 
-Part 2〜4 で示した設計は、新規プロジェクトで最初から採用するのが最もきれいだ。しかし現実には、すでに動いているコードベースに対してこのアプローチを導入したいケースの方が多い。
+Part 2〜4 で示した設計は、新規プロジェクトで最初から採用するのが最もきれいです。しかし現実には、すでに動いているコードベースに対してこのアプローチを導入したいケースの方が多いです。
 
-幸い、Always-Valid Layer とデコーダ合成は局所的に導入できる。全面書き換えなしに、影響を受けやすい箇所から段階的に改善できる。
+幸い、Always-Valid Layer とデコーダ合成は局所的に導入できます。全面書き換えなしに、影響を受けやすい箇所から段階的に改善できます。
 
 ## ステップ 1: Controller の直後にデコーダを挟む
 
-最初に効果が出やすいのは、Controller 層だ。今まで `@Valid` と `BindingResult` で処理していたバリデーションを、Raoh デコーダに置き換える。
+最初に効果が出やすいのは、Controller 層です。今まで `@Valid` と `BindingResult` で処理していたバリデーションを、Raoh デコーダに置き換えます。
 
 **Before**（Bean Validation + Form クラス）:
 
@@ -47,13 +47,13 @@ public ResponseEntity<?> createOrder(@RequestBody JsonNode body) {
 }
 ```
 
-`OrderPlanForm` クラス、`@Valid` アノテーション、`convertToPlan()` メソッド——これらがまとめて不要になる。
+`OrderPlanForm` クラス、`@Valid` アノテーション、`convertToPlan()` メソッド——これらがまとめて不要になります。
 
-この時点では、`orderService.createOrder(OrderPlan)` の先（UseCase・Domain・Repository）は変えていない。Controller だけを変更し、テストが通ることを確認してから次に進む。
+この時点では、`orderService.createOrder(OrderPlan)` の先（UseCase・Domain・Repository）は変えていません。Controller だけを変更し、テストが通ることを確認してから次に進みます。
 
 ## ステップ 2: CreateOrderCommand を消す
 
-デコーダが直接 `OrderPlan` を返すようになると、`CreateOrderCommand` のような入力 DTO の存在が薄れる。
+デコーダが直接 `OrderPlan` を返すようになると、`CreateOrderCommand` のような入力 DTO の存在が薄れます。
 
 ```java
 // Before: Service が Command を受け取っていた
@@ -69,13 +69,13 @@ public void createOrder(OrderPlan plan) {
 }
 ```
 
-`CreateOrderCommand` は同一チームが管理しているはずだ（距離が近い）。`OrderPlan` を直接受け渡せるなら、中間 DTO は不要だ。
+`CreateOrderCommand` は同一チームが管理しているはずです（距離が近い）。`OrderPlan` を直接受け渡せるなら、中間 DTO は不要です。
 
-ただし、`CreateOrderCommand` が複数のエンドポイントや外部システムから参照されている場合は慎重に判断する。外部 API のスキーマとして公開されているなら、それは「契約」であり簡単には消せない。
+ただし、`CreateOrderCommand` が複数のエンドポイントや外部システムから参照されている場合は慎重に判断します。外部 API のスキーマとして公開されているなら、それは「契約」であり簡単には消せません。
 
 ## ステップ 3: Entity クラスを整理する
 
-JPA の `@Entity` アノテーションを持つドメインモデルは、永続化の知識がドメインモデルに混入している状態だ。これを jOOQ または Spring JdbcTemplate ベースのリポジトリに置き換える。
+JPA の `@Entity` アノテーションを持つドメインモデルは、永続化の知識がドメインモデルに混入している状態です。これを jOOQ または Spring JdbcTemplate ベースのリポジトリに置き換えます。
 
 **Before**（JPA Entity がドメインモデルを兼ねている）:
 
@@ -114,20 +114,22 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
 }
 ```
 
-このステップは影響範囲が大きい。最初から全モデルに適用しようとせず、変更頻度が高いエンティティや、テストが書きにくくなっているエンティティから始める。
+このステップは影響範囲が大きいです。最初から全モデルに適用しようとせず、変更頻度が高いエンティティや、テストが書きにくくなっているエンティティから始めます。
 
 ## どこから始めるか
 
-導入の効果が出やすい順に並べる。
+導入の効果が出やすい順に並べます。
 
 | 優先度 | 作業 | 効果 |
 | --- | --- | --- |
-| 高 | Controller に Raoh デコーダを挟む | Form クラスと ConstraintValidator を削除できる。テストが書きやすくなる |
-| 中 | UseCase 境界の Command DTO を削除 | 中間クラスの削除。Controller → UseCase の詰め替えが不要になる |
-| 低 | JPA Entity をドメインモデルから分離 | ドメインモデルの純粋さが増す。影響範囲が大きいので最後に |
+| 高 | Controller に Raoh デコーダを挟む | Form クラスと ConstraintValidator を削除できます。テストが書きやすくなります |
+| 中 | UseCase 境界の Command DTO を削除 | 中間クラスの削除。Controller → UseCase の詰め替えが不要になります |
+| 低 | JPA Entity をドメインモデルから分離 | ドメインモデルの純粋さが増します。影響範囲が大きいので最後に |
 
-どのステップも「全体を一度に変える」必要はない。一つの Controller から始め、テストが通ることを確認してから次に進む。Always-Valid Layer は、一つの境界から少しずつ広げていける設計だ。
+どのステップも「全体を一度に変える」必要はありません。一つの Controller から始め、テストが通ることを確認してから次に進みます。Always-Valid Layer は、一つの境界から少しずつ広げていける設計です。
+
+移行期間中の注意点として、Bean Validation による `OrderPlanForm` とデコーダによる `OrderPlan` が同一アプリケーション内に共存するケースがあります。この場合、UseCase のシグネチャは `OrderPlan` を受け取る形に統一しておくことを推奨します。`OrderPlanForm` を受け取る旧コードは、詰め替え処理（`convertToPlan()`）を Controller 内に閉じ込め、UseCase には触れさせません。これにより、UseCase 以降のコードは移行前後で変更なく保たれます。
 
 ---
 
-次章では、設計判断をどう下すかを整理する。「Raoh と Bean Validation のどちらを選ぶか」「モデル結合と契約結合のどちらを選ぶか」の判断基準をまとめる。
+次章では、設計判断をどう下すかを整理します。「Raoh と Bean Validation のどちらを選ぶか」「モデル結合と契約結合のどちらを選ぶか」の判断基準をまとめます。

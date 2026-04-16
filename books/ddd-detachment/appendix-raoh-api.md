@@ -2,7 +2,7 @@
 title: "付録: Raoh APIリファレンス（本書で使用するもの）"
 ---
 
-本書のサンプルコードで使用する Raoh 0.5.0 の API を一覧する。
+本書のサンプルコードで使用する Raoh 0.5.0 の API を一覧します。
 
 ## 基本の型
 
@@ -21,7 +21,7 @@ public interface Decoder<I, O> {
 }
 ```
 
-入力 `I` を受け取り、`Result<O>` を返す。`JsonNode` を受け取る場合は `Decoder<JsonNode, T>` となる。
+入力 `I` を受け取り、`Result<O>` を返します。`JsonNode` を受け取る場合は `Decoder<JsonNode, T>` となります。
 
 ### `Result<T>`
 
@@ -45,24 +45,24 @@ Result.fail(path, errorCode, message)         // Err を作る（単一エラー
 
 ### `Issues`
 
-バリデーションエラーのリスト。`Err` から取り出せる。
+バリデーションエラーのリストです。`Err` から取り出せます。
 
 ```java
 Issues issues = err.issues();
 issues.asList()  // List<Issue>
 ```
 
-`Issue` は `path()`（エラーが発生したフィールドのパス）と `message()`（エラーメッセージ）を持つ。
+`Issue` は `path()`（エラーが発生したフィールドのパス）と `message()`（エラーメッセージ）を持ちます。
 
 ---
 
 ## JsonDecoders（JSON用の組み込みデコーダ）
 
-`import static net.unit8.raoh.json.JsonDecoders.*` でインポートする。
+`import static net.unit8.raoh.json.JsonDecoders.*` でインポートします。
 
 ### `field(name, decoder)`
 
-JSON オブジェクトから指定したフィールドを取り出して、子デコーダに渡す。
+JSON オブジェクトから指定したフィールドを取り出して、子デコーダに渡します。
 
 ```java
 Decoder<JsonNode, String> d = field("planType", string());
@@ -70,7 +70,7 @@ Decoder<JsonNode, String> d = field("planType", string());
 
 ### `string()`
 
-JSON の文字列値を `String` に変換する。メソッドチェーンでバリデーションを追加できる。
+JSON の文字列値を `String` に変換します。メソッドチェーンでバリデーションを追加できます。
 
 ```java
 string()                  // 文字列（空文字も OK）
@@ -80,15 +80,15 @@ string().date()           // ISO 8601 日付文字列を LocalDate に変換
 
 ### `bool()`
 
-JSON の真偽値を `boolean` に変換する。
+JSON の真偽値を `boolean` に変換します。
 
 ### `int_()`
 
-JSON の数値を `int` に変換する。（`int` は Java の予約語のため末尾に `_` が付く）
+JSON の数値を `int` に変換します。（`int` は Java の予約語のため末尾に `_` が付く）
 
 ### `enumOf(EnumClass.class)`
 
-文字列を列挙型に変換する。列挙型の `name()` と照合する。
+文字列を列挙型に変換します。列挙型の `name()` と照合します。
 
 ```java
 field("frequency", enumOf(DeliveryFrequency.class))
@@ -97,7 +97,7 @@ field("frequency", enumOf(DeliveryFrequency.class))
 
 ### `list(elementDecoder)`
 
-JSON 配列を `List` に変換する。各要素に `elementDecoder` を適用する。
+JSON 配列を `List` に変換します。各要素に `elementDecoder` を適用します。
 
 ```java
 field("meals", list(string().minLength(1)))  // List<String>
@@ -110,7 +110,7 @@ list(string()).minSize(1)                    // 1要素以上
 
 ### `combine(d1, d2, ...)`
 
-複数のデコーダを組み合わせて、タプル（`Tuple2<A, B>` など）を作る。`.map()` でレコードに変換する。
+複数のデコーダを組み合わせて、タプル（`Tuple2<A, B>` など）を作ります。`.map()` でレコードに変換します。
 
 ```java
 Decoder<JsonNode, OrderPlan.StandardPlan> d = combine(
@@ -119,11 +119,11 @@ Decoder<JsonNode, OrderPlan.StandardPlan> d = combine(
 ).map(OrderPlan.StandardPlan::new);
 ```
 
-`combine` は最大8引数（`Tuple2` 〜 `Tuple8`）に対応している。
+`combine` は最大8引数（`Tuple2` 〜 `Tuple8`）に対応しています。
 
 ### `discriminate(fieldName, variants)`
 
-指定フィールドの値でデコーダを切り替える。値ごとに異なる型を返すことができる。
+指定フィールドの値でデコーダを切り替えます。値ごとに異なる型を返すことができます。
 
 ```java
 Decoder<JsonNode, OrderPlan> d = discriminate("planType", Map.of(
@@ -133,13 +133,13 @@ Decoder<JsonNode, OrderPlan> d = discriminate("planType", Map.of(
 ));
 ```
 
-いずれの variant にも一致しない場合、`no variant matched` エラーになる。
+いずれの variant にも一致しない場合、`no variant matched` エラーになります。
 
 ---
 
 ## カスタムデコーダの書き方
 
-Decoder は関数型インターフェースなので、ラムダで書ける。`path` を使った詳細なエラーが必要な場合は、完全な形で書く。
+Decoder は関数型インターフェースなので、ラムダで書けます。`path` を使った詳細なエラーが必要な場合は、完全な形で書きます。
 
 ```java
 // シンプルなカスタムデコーダ
@@ -157,7 +157,7 @@ static final Decoder<JsonNode, LocalDate> START_DATE_DECODER = (in, path) -> {
 };
 ```
 
-`flatMap` は `Function<T, Result<U>>` を受け取る。`path` にアクセスしたい場合は、`Decoder` のラムダ全体を書く。
+`flatMap` は `Function<T, Result<U>>` を受け取ります。`path` にアクセスしたい場合は、`Decoder` のラムダ全体を書きます。
 
 ---
 
@@ -171,4 +171,4 @@ static final Decoder<JsonNode, LocalDate> START_DATE_DECODER = (in, path) -> {
 </dependency>
 ```
 
-`raoh-json` は `raoh-core`（`Decoder`、`Result`、`Issues` を含む）と `jackson-databind` への依存を含む。`raoh-core` だけを使う場合は `raoh-core` アーティファクトを指定できる。
+`raoh-json` は `raoh-core`（`Decoder`、`Result`、`Issues` を含む）と `jackson-databind` への依存を含みます。`raoh-core` だけを使う場合は `raoh-core` アーティファクトを指定できます。

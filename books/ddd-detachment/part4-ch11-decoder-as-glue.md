@@ -4,7 +4,7 @@ title: "デコーダがレイヤーをつなぐ"
 
 ## 注文フロー全体を通して見る
 
-Part 2・3 で個別に見てきたデコーダと状態遷移を、今度はレイヤーを縦断して追う。HTTP リクエストが届いてから DB に書き込まれるまで、データがどのように変換され、どこで変換が起きるかを一覧する。
+Part 2・3 で個別に見てきたデコーダと状態遷移を、今度はレイヤーを縦断して追います。HTTP リクエストが届いてから DB に書き込まれるまで、データがどのように変換され、どこで変換が起きるかを一覧します。
 
 ```text
 HTTP Request (JsonNode)
@@ -22,11 +22,11 @@ HTTP Request (JsonNode)
   永続化ストレージ（DB）
 ```
 
-変換は2回だけだ。Full Mapping で現れる `CreateOrderCommand` や `OrderData` のような中間 DTO は存在しない。
+変換は2回だけです。Full Mapping で現れる `CreateOrderCommand` や `OrderData` のような中間 DTO は存在しません。
 
 ## 入口：@RequestBody JsonNode
 
-Controller は `@RequestBody JsonNode` で受け取る。
+Controller は `@RequestBody JsonNode` で受け取ります。
 
 ```java
 @PostMapping
@@ -52,13 +52,13 @@ public ResponseEntity<?> createOrder(@RequestBody JsonNode body) {
 }
 ```
 
-デコーダが `Result<OrderPlan>` を返す。`Ok` なら型が確定した `OrderPlan` が手に入る。`Err` なら構造化されたエラー情報が手に入る。中間の `OrderForm` も `CreateOrderCommand` も存在しない。
+デコーダが `Result<OrderPlan>` を返します。`Ok` なら型が確定した `OrderPlan` が手に入ります。`Err` なら構造化されたエラー情報が手に入ります。中間の `OrderForm` も `CreateOrderCommand` も存在しません。
 
-`@Valid` アノテーションも `BindingResult` も不要だ。デコーダ自体がバリデーションと型変換を同時に行う。
+`@Valid` アノテーションも `BindingResult` も不要です。デコーダ自体がバリデーションと型変換を同時に行います。
 
 ## 型の確定とパターンマッチ
 
-`Ok` ブランチで得られる `plan` は `OrderPlan` 型だが、`switch` を使えばプランの種類ごとに型が確定する。
+`Ok` ブランチで得られる `plan` は `OrderPlan` 型ですが、`switch` を使えばプランの種類ごとに型が確定します。
 
 ```java
 String description = switch (plan) {
@@ -72,11 +72,11 @@ String description = switch (plan) {
 };
 ```
 
-コンパイラが網羅性を保証する。新しいプランの種類が追加されたとき、このコードはコンパイルエラーになる。実行時エラーとして現れる前に気付ける。
+コンパイラが網羅性を保証します。新しいプランの種類が追加されたとき、このコードはコンパイルエラーになります。実行時エラーとして現れる前に気付けます。
 
 ## 出口：リポジトリが詰め替えを担う
 
-`subscriptionRepository.save(subscription)` の先は、リポジトリ実装が担う。Controller は詰め替えを知らない。
+`subscriptionRepository.save(subscription)` の先は、リポジトリ実装が担います。Controller は詰め替えを知りません。
 
 ```java
 // リポジトリ実装内の詰め替えロジック
@@ -95,7 +95,7 @@ private SubscriptionRow toActiveRow(Subscription.Active a) {
 }
 ```
 
-実際のアプリケーションでは `store.put(...)` の部分が jOOQ の DSL になる。
+実際のアプリケーションでは `store.put(...)` の部分が jOOQ の DSL になります。
 
 ```java
 // jOOQ を使った場合の例
@@ -107,11 +107,11 @@ case Subscription.Active a -> jooq.insertInto(SUBSCRIPTIONS)
         .execute();
 ```
 
-ドメインモデルの `Subscription` は `@Entity` アノテーションを持たない。jOOQ は `ResultSet` を直接 Java オブジェクトにマッピングするので、ORM のようにドメインモデル自体に永続化の知識を持たせる必要がない。
+ドメインモデルの `Subscription` は `@Entity` アノテーションを持ちません。jOOQ は `ResultSet` を直接 Java オブジェクトにマッピングするので、ORM のようにドメインモデル自体に永続化の知識を持たせる必要がありません。
 
 ## Part 1 の構成との対比
 
-Ch 1 で示した Full Mapping の構成と比較する。
+Ch 1 で示した Full Mapping の構成と比較します。
 
 ```text
 【Full Mapping】
@@ -141,13 +141,13 @@ DB
 2 種類のオブジェクト、2 回の変換
 ```
 
-消えたものは何か。
+消えたものは何でしょうか。
 
-- `OrderForm`: Bean Validation のためのフラットなクラス。デコーダが `JsonNode` を直接 `OrderPlan` に変換するので不要。
-- `CreateOrderCommand`: UseCase の境界を明示するための DTO。Controller と UseCase が同じチームの同じリポジトリにあるなら不要（距離が近い）。
-- `OrderEntity`: JPA のエンティティクラス。jOOQ はドメインモデルから直接 DSL で SQL を発行できるので不要。
+- `OrderForm`: Bean Validation のためのフラットなクラスです。デコーダが `JsonNode` を直接 `OrderPlan` に変換するので不要です。
+- `CreateOrderCommand`: UseCase の境界を明示するための DTO です。Controller と UseCase が同じチームの同じリポジトリにあるなら不要です（距離が近い）。
+- `OrderEntity`: JPA のエンティティクラスです。jOOQ はドメインモデルから直接 DSL で SQL を発行できるので不要です。
 
-削除したのではなく、それらの役割が別の場所に吸収された。
+削除したのではなく、それらの役割が別の場所に吸収されました。
 
 - `OrderForm` の役割 → `OrderPlanDecoder`（デコーダが型変換とバリデーションを担う）
 - `CreateOrderCommand` の役割 → `OrderPlan` が直接 UseCase に渡る（中間 DTO なし）
@@ -155,6 +155,6 @@ DB
 
 ---
 
-Part 4 のまとめ: 詰め替えは「なくす」のではなく「適切な場所に集める」ものだ。境界（入口）ではデコーダが一回変換し、型を確定させる。内部（ドメイン層）ではドメインモデルをそのまま扱う。出口（リポジトリ実装）ではドメインモデルを永続化形式に変換する。この配置が、変更の波及を最小にしながら、詰め替えの総量も最小にする。
+Part 4 のまとめ: 詰め替えは「なくす」のではなく「適切な場所に集める」ものです。境界（入口）ではデコーダが一回変換し、型を確定させます。内部（ドメイン層）ではドメインモデルをそのまま扱います。出口（リポジトリ実装）ではドメインモデルを永続化形式に変換します。この配置が、変更の波及を最小にしながら、詰め替えの総量も最小にします。
 
-次の Part 5 では、こうした設計を既存のコードベースにどう導入するか、また設計判断の基準をどう立てるかを見ていく。
+次の Part 5 では、こうした設計を既存のコードベースにどう導入するか、また設計判断の基準をどう立てるかを見ていきます。
