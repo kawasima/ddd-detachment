@@ -6,6 +6,8 @@ import java.util.List;
 public sealed interface OrderPlan
         permits OrderPlan.StandardPlan, OrderPlan.PremiumPlan, OrderPlan.CustomPlan {
 
+    DeliveryFrequency frequency();
+
     record StandardPlan(
             MealSetId mealSetId,
             DeliveryFrequency frequency
