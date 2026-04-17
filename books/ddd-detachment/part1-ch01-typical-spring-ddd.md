@@ -227,7 +227,7 @@ public class OrderPlan {
 
 コードを追うと、次のことが見えてきます。
 
-**詰め替えの回数**: HTTP リクエストから DB 書き込みまでに、少なくとも3回の詰め替えが発生しています。`OrderPlanForm` → `CreateOrderCommand` → `Subscription` → JPA がテーブルにマッピング、という流れです。
+**詰め替えの回数**: HTTP リクエストから DB 書き込みまでに、`OrderPlanForm` → `CreateOrderCommand` → `Subscription` → JPA がテーブルにマッピング、という流れで詰め替えが発生しています。JPA の自動マッピングを含めると3箇所、手書きの型変換コードに限ると2箇所です（数え方の定義は9章で整理します）。
 
 **型の曖昧さ**: `OrderPlanForm` でバリデーションが通った後も、型は `OrderPlanForm` のままです。`planType = "STANDARD"` のとき `mealSetId` が null かどうかは、実行時にしかわかりません。バリデーションが通過した後も、防御的な null チェックや `planType` による分岐が各所に現れます。
 

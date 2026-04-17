@@ -238,7 +238,7 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
 }
 ```
 
-> **サンプルコード**: `toJpaEntity()` を含む完全な実装は `examples/mealse-delivery/` の `SubscriptionRepositoryImpl` を参照してください。
+> **注**: `toJpaEntity()` を含む完全な実装は、本書のコード断片を実装したプロジェクトの `SubscriptionRepositoryImpl` に相当します。
 
 相互変換の記述量は増えますが、JPA が提供する変更追跡・遅延ロード・キャッシュといった機能を捨てずに、ドメインモデルを関心から解放できます。値オブジェクト（`UserId` など）の変換は `@Converter` や `@Embeddable` で吸収できます。
 

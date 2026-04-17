@@ -43,7 +43,7 @@ title: "はじめに"
 
 ## サンプルコードについて
 
-本書の Java サンプルは `examples/mealse-delivery/` 配下に Maven プロジェクトとして収められており、`mvn clean test` が通ることを確認しています。環境は Java 25、Spring Boot 4、Raoh 0.5.0 です。本文のコード断片は実際に動作するものの抜粋または短縮版です。
+本書の Java サンプルは本文中に掲載しているコード断片を実際に動作するプロジェクトから抜粋・短縮したものです。環境は Java 25、Spring Boot 4、Raoh 0.5.0 です。
 
 > **バージョンについて**: Raoh 0.5.0 は Java 25 以上を必要とします。`sealed interface` と `record` 自体は Java 17 から正式機能ですが、Raoh のビルドおよびランタイム要件として Java 25 が必要です。Spring Boot 4 系は Java 17 以上をサポートしていますが、本書のサンプルを動かすには Java 25 以上の環境をご用意ください。
 

@@ -41,7 +41,7 @@ private OrderPlan buildPlan(CreateOrderCommand command) {
 
 ## フィールド1つの追加が、複数クラスの修正に波及する
 
-HTTP リクエストから DB 書き込みまでに、少なくとも3回の詰め替えが発生します。
+HTTP リクエストから DB 書き込みまでに、手書きの型変換が2箇所、JPA の自動マッピングを含めると3箇所で詰め替えが発生します。
 
 ```mermaid
 flowchart TD
@@ -51,7 +51,7 @@ flowchart TD
     D[(DB)]
     A -->|詰め替え（Controller）| B
     B -->|詰め替え（ApplicationService）| C
-    C -->|詰め替え（JPA が自動マッピング）| D
+    C -->|JPA が自動マッピング| D
 ```
 
 各詰め替えのコードは、それ自体はシンプルな値コピーです。しかし積み重なると、「何をやっているかわかるコード」の大半が「値をコピーするだけのコード」になります。
