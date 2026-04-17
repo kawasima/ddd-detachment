@@ -167,7 +167,7 @@ flowchart TD
 
 `CreateOrderCommand` のような Local DTO（UseCase 専用の入力クラス）が生まれる根本的な理由は、**Bean Validation のバリデーション結果が型に反映されない**ことにあります。
 
-Bean Validation を通過した後のオブジェクトは `OrderPlanForm` のままです。`planType` は `String`、`mealSetId` も `String` のまま——ドメインの型（`OrderPlan`）ではありません。Controller がこの `OrderPlanForm` を UseCase に直接渡してしまうと、UseCase がプレゼンテーション層のクラス（`OrderPlanForm`）に依存することになります。それを避けるために `CreateOrderCommand` という中間の Local DTO が登場します。
+Bean Validation を通過した後のオブジェクトは `OrderPlanForm` のままです。`planType` は `String`、`mealSetId` も `String` のまま——ドメインの型（`OrderPlan`）ではありません。Controller がこの `OrderPlanForm` を UseCase に直接渡してしまうと、UseCase がプレゼンテーション層のクラス（`OrderPlanForm`）に依存します。それを避けるために `CreateOrderCommand` という中間の Local DTO が登場します。
 
 ```mermaid
 flowchart LR

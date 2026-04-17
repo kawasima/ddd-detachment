@@ -131,7 +131,7 @@ Decoder<JsonNode, OrderPlan.StandardPlan> d = combine(
 
 ### `discriminate(fieldName, variants)`
 
-指定フィールドの値でデコーダを切り替えます。値ごとに異なる型を返すことができます。
+指定フィールドの値でデコーダを切り替えます。値ごとに異なる型を返せます。
 
 ```java
 Decoder<JsonNode, OrderPlan> d = discriminate("planType", Map.of(

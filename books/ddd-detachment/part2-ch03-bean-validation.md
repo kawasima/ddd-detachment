@@ -188,7 +188,7 @@ public class GlobalExceptionHandler {
 
 ## 実装を続けると見えてくること
 
-このBean Validationによる実装を複雑なドメインに使い続けると、いくつかの場面でコードが予想外の方向に向かいます。具体的には以下の4つの課題が現れます。
+このBean Validationによる実装を複雑なドメインに使い続けると、いくつかの場面でコードが予想外の形になります。具体的には以下の4つの課題が現れます。
 
 ### フォームクラスに使われないフィールドが増えていく
 
@@ -200,7 +200,7 @@ public class GlobalExceptionHandler {
 
 `@Validated` で検証が通ったとしても、コントローラーの手元にあるのは相変わらず `OrderPlanForm` です。「どのプランか」を知るには `getPlanType()` を呼んで文字列を確認するしかありません。
 
-そのため、コントローラーでドメインモデルを組み立てるための **2回目の `switch` 文** が必要になります。バリデーターの `switch` と合わせて、同じ分岐ロジックがコードベースに2箇所存在することになります。
+そのため、コントローラーでドメインモデルを組み立てるための **2回目の `switch` 文** が必要です。バリデーターの `switch` と合わせて、同じ分岐ロジックがコードベースに2箇所存在します。
 
 ### 構造が深くなるほどバリデーターが膨らんでいく
 
@@ -273,7 +273,7 @@ public record StandardPlanForm(
 
 - **エラー露出の分岐**: 未知の `planType` が来たときは Jackson 側で `InvalidTypeIdException`（実行時は `HttpMessageNotReadableException`）が投げられ、Bean Validation の `MethodArgumentNotValidException` とは別経路になります。両方をまとめて同じ JSON 形式のエラーレスポンスに変換するには、独自の `@ControllerAdvice` が必要です。
 - **Form に sealed 階層が露出する**: プレゼンテーション層のクラスにドメインの型階層が持ち込まれます。Form クラスをそのまま UseCase に渡せばドメイン型を兼ねられますが、Form と sealed 階層が一体化するため、**Form はもうプレゼンテーション層専用ではなくドメイン型を兼ねた存在**になります。
-- **Jackson アノテーションの混入**: sealed interface 自身に `@JsonTypeInfo` が付きます。ドメインモデルとしては「JSON 表現形式」という関心が混入することになります。
+- **Jackson アノテーションの混入**: sealed interface 自身に `@JsonTypeInfo` が付きます。ドメインモデルに「JSON 表現形式」という関心が混入します。
 
 本書の立場は、「Jackson polymorphic deserialization + sealed interface」はこれはこれで有効な選択肢であり、特に既存プロジェクトが Jackson に強く寄っている場合には検討に値する、というものです。本書が提示するのは、Jackson アノテーションを介さずに JSON からドメイン型への変換を合成的に組み立てる**別の選択肢**としてのデコーダ合成です。二者択一ではなく、プロジェクトの文脈で選んでください。
 
@@ -319,7 +319,7 @@ flowchart TD
     C --> D
 ```
 
-「入力検証」と「ビジネスロジック検証」の境界が曖昧になり、DB を確認する処理がレイヤーをまたいで散らばります。I/O を伴うバリデーションは `ConstraintValidator` に収まらず、レイヤーをまたいで散らばりやすいのです。
+「入力検証」と「ビジネスロジック検証」の境界が曖昧になり、DB を確認する処理がレイヤーをまたいで散らばります。I/O を伴うバリデーションは `ConstraintValidator` に収まらず、レイヤーをまたいで散らばります。
 
 ---
 

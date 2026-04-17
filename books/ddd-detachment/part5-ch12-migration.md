@@ -6,7 +6,7 @@ title: "既存コードへの導入"
 
 3〜11章で示した設計は、新規プロジェクトで最初から採用するのが最もきれいです。しかし現実には、すでに動いているコードベースに対してこのアプローチを導入したいケースの方が多いです。
 
-幸い、Always-Valid Layer とデコーダ合成は局所的に導入できます。全面書き換えなしに、影響を受けやすい箇所から段階的に改善できます。導入は3つのステップで段階的に進めることをお勧めします。最初に Controller から始め、テストが通ることを確認してから次に進みます。
+幸い、Always-Valid Layer とデコーダ合成は局所的に導入できます。全面書き換えなしに、影響の出やすい箇所から段階的に改善できます。導入は3つのステップで進めます。最初に Controller から始め、テストが通ることを確認してから次に進みます。
 
 ## ステップ 1: Controller の直後にデコーダを挟む
 
@@ -114,7 +114,7 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
 }
 ```
 
-このステップは影響範囲が大きいです。最初から全モデルに適用しようとせず、変更頻度が高いエンティティや、テストが書きにくくなっているエンティティから始めます。
+このステップは影響範囲が大きいです。最初から全モデルに適用しようとせず、変更頻度が高いエンティティや、テストが書きづらいエンティティから始めます。
 
 ### ORM 選択の注意
 
@@ -133,7 +133,7 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
 
 | 優先度 | 作業 | 効果 |
 | --- | --- | --- |
-| 高 | Controller に Raoh デコーダを挟む | Form クラスと ConstraintValidator を削除できます。テストが書きやすくなります |
+| 高 | Controller に Raoh デコーダを挟む | Form クラスと ConstraintValidator を削除できます。テストが書けるようになります |
 | 中 | UseCase 境界の Command DTO を削除 | 中間クラスの削除。Controller → UseCase の詰め替えが不要になります |
 | 低 | JPA Entity をドメインモデルから分離 | ドメインモデルの純粋さが増します。影響範囲が大きいので最後に |
 

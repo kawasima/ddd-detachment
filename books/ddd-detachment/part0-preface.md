@@ -21,7 +21,7 @@ title: "はじめに"
 
 ## 前提知識
 
-- Java の基礎（`record`・`sealed interface` は本文で必要な範囲を説明しますが、Java 17 以降の構文に触れた経験があると読み進めやすい）
+- Java の基礎（`record`・`sealed interface` は本文で必要な範囲を説明しますが、Java 17 以降の構文に触れた経験があるとスムーズに読める）
 - Spring Boot の基礎（`@RestController`、`@RequestBody`、依存性注入などの基本用語）
 - Bean Validation（`@NotNull`、`@Valid` などを見たことがある程度で十分です）
 - JPA または jOOQ の名前を知っている程度
