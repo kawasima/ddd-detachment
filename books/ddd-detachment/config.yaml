@@ -1,4 +1,4 @@
-title: "古典ドメインモデリングパターンの解脱"
+title: "古典ドメインモデルパターンの解脱"
 summary: "古典的なDDD/クリーンアーキテクチャを採用したJava Webアプリケーションで生じる「モデル増殖」「詰め替え過剰」「ドメインモデルの肥大化」という問題を診断し、Always-Valid LayerとRaohによるデコーダ合成で解消する設計を解説する。本書は無料です。内容が役に立ったと感じたら、本書で使用しているライブラリ Raoh（https://github.com/kawasima/raoh）にスターを付けたり、実際のプロジェクトで試してみたりしていただけると励みになります。"
 topics: ["java", "ddd", "architecture", "spring", "設計"]
 published: true
