@@ -4,6 +4,7 @@ topics: ["java", "ddd", "architecture", "spring", "設計"]
 published: false
 price: 0
 chapters:
+  - part0-preface
   - part1-ch01-typical-spring-ddd
   - part1-ch02-problems
   - part2-ch03-bean-validation

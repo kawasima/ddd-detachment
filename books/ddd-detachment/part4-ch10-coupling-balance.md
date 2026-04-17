@@ -12,28 +12,34 @@ title: "結合強度と距離のバランス"
 
 ## 結合強度：モデル結合と契約結合
 
-Balancing Coupling では、モジュール間の統合強度として次の2種類を区別します。
+Balancing Coupling では、モジュール間の統合強度として次の2種類を区別します。何を共有するかによって、変更の波及範囲がどう変わるかが変わります。
 
 ### モデル結合（Model Coupling）
 
 モジュール間でドメインモデルを直接共有します。詰め替えが不要な反面、一方のモデル変更が他方に直接波及します。
 
-```text
-UseCase ──[Subscription]──▶ Repository
-                 ↑
-         モデルを共有。Subscription の変更は
-         UseCase にも Repository にも影響する
+```mermaid
+flowchart LR
+    A[UseCase] -->|Subscription| B[Repository]
+    subgraph note [" "]
+        direction LR
+        N["モデルを共有。<br/>Subscription の変更は<br/>UseCase にも Repository にも影響する"]
+    end
+    style note fill:transparent,stroke-dasharray: 5 5
 ```
 
 ### 契約結合（Contract Coupling）
 
 モジュール間のやり取りに専用のモデル（DTO）を使います。変更の波及を抑えられますが、モデルの数と詰め替えの量が増えます。
 
-```text
-UseCase ──[SubscriptionData]──▶ Repository
-              ↑
-        専用の転送モデル。Subscription が変わっても
-        SubscriptionData が変わらなければ影響しない
+```mermaid
+flowchart LR
+    A[UseCase] -->|SubscriptionData| B[Repository]
+    subgraph note [" "]
+        direction LR
+        N["専用の転送モデル。<br/>Subscription が変わっても<br/>SubscriptionData が変わらなければ影響しない"]
+    end
+    style note fill:transparent,stroke-dasharray: 5 5
 ```
 
 Full Mapping は契約結合を各レイヤー間で適用した結果です。モデルの数が最も多く、変更の影響が最も局所化されます。
@@ -54,7 +60,17 @@ Balancing Coupling のもう一方の軸が「距離」です。距離とは、2
 
 距離が遠い場合は、契約結合が必要になります。マイクロサービス間でドメインモデルを直接共有してしまうと、一方のサービスの変更が他方のサービスを壊します。この境界には専用の転送モデルが必要です。
 
-## DIPで詰め替えの責務を逆転させる
+### 距離は時間とともに変わる
+
+ここまでは現時点の距離を静的に評価しました。実際の設計では、距離は時間とともに変化します。判断するときは 6〜12 ヶ月のスパンで次の3点を見込みに入れます。
+
+- **組織のスケール**: チームが分割される、外注パートナーが入る、といった見込みがあるか
+- **モジュール切り出し**: いまは単一デプロイだが、特定のモジュールをサービスとして切り出す計画があるか
+- **外部公開**: 将来的に API を社外に公開する、SDK を配布する、といった予定があるか
+
+これらに**具体的なロードマップがある場合**は、現在の距離が近くても契約結合を選ぶ判断はあり得ます。過剰設計ではなく、見えている変化への先行投資です。
+
+逆に「将来どうなるか分からない」というレベルの不確定予測で契約結合を選ぶのは、詰め替えコストに対して得られる独立性が見合わない傾向があります。13章の「過剰設計としての契約結合」とも合わせて、**ロードマップの具体性**を判断材料にしてください。
 
 通常のレイヤードアーキテクチャでは、上位層が下位層を呼び出します。詰め替えの責務は呼び出し側（上位層）にあります。
 
@@ -83,7 +99,7 @@ public class SubscriptionUseCase {
         Subscription.Active active = repository.findActive(id);
         Subscription.Suspended suspended = behavior.suspend(active);
 
-        // UseCase はドメインオブジェクトをそのまま渡す
+        // UseCase はドメインモデルをそのまま渡す
         repository.save(suspended);
     }
 }
@@ -103,9 +119,10 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
                     .set(SUBSCRIPTIONS.NEXT_DELIVERY_DATE, a.nextDeliveryDate())
                     // ...
                     .execute();
+            // Suspended には nextDeliveryDate フィールドがないため、
+            // NEXT_DELIVERY_DATE 列はセットしない（DB 側の DEFAULT NULL に任せる）
             case Subscription.Suspended s -> jooq.insertInto(SUBSCRIPTIONS)
                     .set(SUBSCRIPTIONS.STATUS, "SUSPENDED")
-                    .set(SUBSCRIPTIONS.NEXT_DELIVERY_DATE, (LocalDate) null)
                     // ...
                     .execute();
         }
@@ -121,15 +138,21 @@ UseCase はドメインモデルのみを知ります。詰め替えは `Subscri
 
 この条件では、2-way Mapping + DIP の構成がちょうどよいです。
 
-```text
-[近い距離・強い結合でも許容]
-
-HTTP Layer          Domain Layer        DB Layer
-OrderPlanDecoder ── OrderPlan ────────▶ RepositoryImpl
-     ↑                  ↑                    ↑
-  JsonNode から      ドメインモデルを      DIPで詰め替えを
-  直接変換           共有する             実装クラスに閉じ込める
+```mermaid
+flowchart LR
+    subgraph HTTP["HTTP Layer"]
+        A["OrderPlanDecoder<br/>JsonNode から直接変換"]
+    end
+    subgraph Domain["Domain Layer"]
+        B["OrderPlan<br/>ドメインモデルを共有する"]
+    end
+    subgraph DB["DB Layer"]
+        C["RepositoryImpl<br/>DIP で詰め替えを実装クラスに閉じ込める"]
+    end
+    A --> B --> C
 ```
+
+[近い距離・強い結合でも許容]
 
 - **HTTP Layer → Domain Layer**: Raoh の `OrderPlanDecoder` が `JsonNode` を `OrderPlan` に変換します。この1回の詰め替えで済みます。
 - **Domain Layer → DB Layer**: `SubscriptionRepositoryImpl` が `Subscription` を jOOQ の DSL に変換します。DIP により、UseCase は詰め替えを知りません。

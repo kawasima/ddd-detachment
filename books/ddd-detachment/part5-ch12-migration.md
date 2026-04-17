@@ -4,9 +4,9 @@ title: "既存コードへの導入"
 
 ## 全面書き換えは必要ない
 
-Part 2〜4 で示した設計は、新規プロジェクトで最初から採用するのが最もきれいです。しかし現実には、すでに動いているコードベースに対してこのアプローチを導入したいケースの方が多いです。
+3〜11章で示した設計は、新規プロジェクトで最初から採用するのが最もきれいです。しかし現実には、すでに動いているコードベースに対してこのアプローチを導入したいケースの方が多いです。
 
-幸い、Always-Valid Layer とデコーダ合成は局所的に導入できます。全面書き換えなしに、影響を受けやすい箇所から段階的に改善できます。
+幸い、Always-Valid Layer とデコーダ合成は局所的に導入できます。全面書き換えなしに、影響を受けやすい箇所から段階的に改善できます。導入は3つのステップで段階的に進めることをお勧めします。最初に Controller から始め、テストが通ることを確認してから次に進みます。
 
 ## ステップ 1: Controller の直後にデコーダを挟む
 
@@ -116,6 +116,17 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
 
 このステップは影響範囲が大きいです。最初から全モデルに適用しようとせず、変更頻度が高いエンティティや、テストが書きにくくなっているエンティティから始めます。
 
+### ORM 選択の注意
+
+本書のサンプルは jOOQ を採用していますが、これは「ドメインモデルから `@Entity` を剥がす」という原理を最短で示すためです。**「jOOQ が常に正解」という主張ではありません。** 実務では次の観点で判断します。
+
+- **既存チームの習熟度**: JPA に慣れたチームを jOOQ に移行させるコストは無視できません。学習曲線とプロジェクトの期間を比較します。
+- **動的クエリの比重**: 複雑な条件分岐や動的 JOIN が多いシステムでは jOOQ の型安全 DSL が効く一方、CRUD が中心のシステムでは Spring Data JPA の自動生成の恩恵が大きいです。
+- **トランザクション境界**: JPA の永続化コンテキストは `@Transactional` との親和性が高く、jOOQ はこれを自前で扱う必要があります。
+- **スキーマ駆動かコード駆動か**: DB スキーマが外部から与えられるシステムは jOOQ のコードジェネレータが相性よく、アプリケーション主導でスキーマを設計する場合は JPA/Hibernate が選ばれがちです。
+
+重要なのは「**`@Entity` がドメインモデルを兼ねる構成を避ける**」ことであり、そのために JPA を捨てる必要はありません。8章「JPA を使いながら分離する」で示したとおり、JPA 用の永続化エンティティとドメインモデルを別クラスにする構成で同じ効果が得られます。本書の思想を採用するかどうかと、どの ORM を選ぶかは、**独立した判断**です。
+
 ## どこから始めるか
 
 導入の効果が出やすい順に並べます。
@@ -129,6 +140,16 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
 どのステップも「全体を一度に変える」必要はありません。一つの Controller から始め、テストが通ることを確認してから次に進みます。Always-Valid Layer は、一つの境界から少しずつ広げていける設計です。
 
 移行期間中の注意点として、Bean Validation による `OrderPlanForm` とデコーダによる `OrderPlan` が同一アプリケーション内に共存するケースがあります。この場合、UseCase のシグネチャは `OrderPlan` を受け取る形に統一しておくことを推奨します。`OrderPlanForm` を受け取る旧コードは、詰め替え処理（`convertToPlan()`）を Controller 内に閉じ込め、UseCase には触れさせません。これにより、UseCase 以降のコードは移行前後で変更なく保たれます。
+
+### 移行時の落とし穴
+
+Controller を `@Valid @RequestBody OrderPlanForm` から `@RequestBody JsonNode` に切り替えると、Spring MVC の既定の動きがいくつか変わります。移行時に踏みやすい落とし穴を整理します。
+
+- **バリデーションエラーのハンドラが発火しなくなる**: `@Valid` が外れるため、`MethodArgumentNotValidException` を前提にした既存の `@ControllerAdvice` はこのエンドポイントでは発火しません。代わりに、Raoh の `Err` を HTTP エラーに変換する処理を各 Controller に書くか、共通化する必要があります。また「そもそも JSON として解釈できない」リクエストには `HttpMessageNotReadableException` が出ます。これは 3 章「JSON として解釈できないリクエスト」を参照してください。**3種類のエラー形式（既存の Bean Validation エラー、Raoh の Err、JSON 解析失敗）が混在するため、クライアントに返す JSON スキーマを統一する工夫が必要です。** 最もシンプルな対処は、`@ControllerAdvice` で各例外を共通のエラー DTO に変換することです。例えば `MethodArgumentNotValidException`・`Err`・`HttpMessageNotReadableException` をすべて `{ "errors": [{ "field": "...", "message": "..." }] }` の形に正規化するハンドラを1つ用意すれば、クライアントは形式を気にせず処理できます。移行完了後は Bean Validation のハンドラを削除できます。
+- **OpenAPI/springdoc のスキーマ自動生成が効かなくなる**: springdoc は Bean Validation のアノテーションとフォームクラスのフィールドを走査してスキーマを生成します。`@RequestBody JsonNode` にするとスキーマが空、あるいは `object` としか出ません。`OrderPlan` の sealed 階層から OpenAPI ドキュメントを作るには、`@Schema` を手書きするか、ドキュメント専用の DTO（Form クラスを残しつつ Controller では使わない）を別途用意する方法があります。
+- **フロントエンド向けコード生成への影響**: `openapi-generator` などで TypeScript 型を生成している場合、スキーマの欠落は生成コードの欠落につながります。移行を段階的に進めるときは、**API ドキュメント側が遅れないように** 生成設定を見直してください。
+
+これらは「Raoh デコーダを導入すると自動的にきれいになる」わけではありません。Spring MVC の既定機能が Bean Validation を前提に組まれているため、代替手段を用意する手間が一時的に増えます。導入の効果（フォームクラスと `ConstraintValidator` の削除）とこれらのコストを天秤にかけて、移行範囲を決めてください。
 
 ---
 
