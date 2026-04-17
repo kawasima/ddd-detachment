@@ -196,27 +196,94 @@ public class SubscriptionController {
 }
 ```
 
-## 何が問題か
+## 実装を続けると見えてくること
 
-このBean Validationによる実装には、構造的な問題が3つあります。
+このBean Validationによる実装を複雑なドメインに使い続けると、いくつかの場面でコードが予想外の方向に向かいます。
 
-### 問題1: フォームクラスに「ありえない状態」が存在する
+### フォームクラスに使われないフィールドが増えていく
 
 `OrderPlanForm` はプランの種類にかかわらず全フィールドを持ちます。つまり「STANDARDプランなのに `mealIds` が入っている」「CUSTOMプランなのに `mealSetId` も `mealIds` も入っていない」といった状態が、クラスの構造上は許されてしまいます。
 
 バリデーターがそれを弾いてくれるとはいえ、**型を見ただけでは不正な状態が排除されているとは分かりません**。
 
-### 問題2: バリデーション通過後も型が曖昧なまま
+### バリデーション通過後に、もう一度プランタイプで分岐することになる
 
 `@Validated` で検証が通ったとしても、コントローラーの手元にあるのは相変わらず `OrderPlanForm` です。「どのプランか」を知るには `getPlanType()` を呼んで文字列を確認するしかありません。
 
 そのため、コントローラーでドメインオブジェクトを組み立てるための **2回目の `switch` 文** が必要になります。バリデーターの `switch` と合わせて、同じ分岐ロジックがコードベースに2箇所存在することになります。
 
-### 問題3: 構造の深さに比例してバリデーターが肥大化する
+### 構造が深くなるほどバリデーターが膨らんでいく
 
-今回の例はプランが3種類で浅い構造ですが、実際の業務では入れ子の分岐が生まれやすいです。たとえば「CUSTOMプランの場合、配送エリアが北海道・沖縄なら追加料金の確認が必要」といった条件が加わると、バリデーターのネストがさらに深くなります。
+今回の例はプランが3種類で浅い構造ですが、実際の業務では入れ子の分岐が生まれやすいです。たとえば「CUSTOMプランの場合、配送エリアが北海道・沖縄なら追加料金の確認フラグが必要」といった条件が加わると、`validateCustom()` の中がこうなります。
 
-Bean Validationはこの入れ子の分岐に対応する仕組みを持っていません。`ConstraintValidator` は単一の `isValid()` メソッドで全分岐を処理する設計であり、分岐を別クラスに分離する公式のメカニズムがありません。グループ切り替え（`@GroupSequence`）で部分的な対応は可能ですが、プランタイプに応じた条件付きバリデーション（「`planType` が `CUSTOM` のときだけ `startDate` を検証する」）には使えません。結果として `ConstraintValidator` の中で `if` と `switch` の手続きコードが膨らんでいきます。
+```java
+private boolean validateCustom(OrderPlanForm form,
+                               ConstraintValidatorContext context) {
+    boolean valid = true;
+    if (form.getMealIds() == null || form.getMealIds().isEmpty()) {
+        addViolation(context, "mealIds", "食材を1つ以上選択してください");
+        valid = false;
+    }
+    if (form.getStartDate() == null) {
+        addViolation(context, "startDate", "開始日は必須です");
+        valid = false;
+    } else if (form.getStartDate().isBefore(LocalDate.now().plusDays(3))) {
+        addViolation(context, "startDate", "開始日は3日以上先の日付を指定してください");
+        valid = false;
+    }
+    // 配送エリアの条件が追加された
+    if ("HOKKAIDO".equals(form.getDeliveryRegion())
+            || "OKINAWA".equals(form.getDeliveryRegion())) {
+        if (form.getSurchargeAgreed() == null || !form.getSurchargeAgreed()) {
+            addViolation(context, "surchargeAgreed", "追加料金への同意が必要です");
+            valid = false;
+        }
+    }
+    return valid;
+}
+```
+
+条件が1つ増えるたびに `isValid()` の中（またはそこから呼ばれるメソッドの中）にコードが追加されていきます。Bean Validationはこの入れ子の分岐を別クラスに切り出す公式のメカニズムを持っていません。グループ切り替え（`@GroupSequence`）で部分的な対応は可能ですが、「`planType` が `CUSTOM` かつ `deliveryRegion` が特定値のときだけ `surchargeAgreed` を検証する」といった複合条件には対応できません。結果として `ConstraintValidator` の中で `if` と `switch` の手続きコードが膨らんでいきます。
+
+### I/O を伴うバリデーションがレイヤーをまたいで散らばる
+
+上記3つの問題はすべて「入力の形とドメインの型のミスマッチ」という構造的な問題ですが、実際のアプリケーションではもう一つ、別の次元の問題が顕在化します。「指定されたミールセットが DB に存在するか」という確認です。
+
+古典的なやり方では、`ConstraintValidator` に `@Autowired` でリポジトリを注入します。
+
+```java
+// よく見られる実装: ConstraintValidator がリポジトリに依存する
+@Component
+public class MealSetExistsValidator
+        implements ConstraintValidator<MealSetExists, String> {
+
+    @Autowired
+    private MealSetRepository mealSetRepository; // ← リポジトリを直接注入
+
+    @Override
+    public boolean isValid(String mealSetId, ConstraintValidatorContext ctx) {
+        if (mealSetId == null) return true;
+        return mealSetRepository.existsById(mealSetId);
+        // ↑ バリデーション層からリポジトリを呼んでいる
+        //   ビジネスロジックとしての「存在確認」がここに置かれてしまう
+    }
+}
+```
+
+これにはいくつかの問題があります。
+
+第一に、バリデーション層がデータアクセス層（リポジトリ）を知ってしまいます。`ConstraintValidator` は Spring のコンポーネントとして管理する必要があり、単純な POJO として扱えなくなります。
+
+第二に、「存在するか」という確認はフォーマット検証ではなくビジネスロジックの一部ですが、それがコントローラーの手前に置かれてしまいます。実際のビジネス処理（在庫の確認、ミールセットの有効期限チェックなど）はサービス層にあります。結果として「MealSetId が DB に存在するか」という確認がバリデーター（Controller の前）に、「MealSet の在庫があるか」「有効期限内か」という確認がサービス層（UseCase の中）に、それぞれ散らばります。
+
+```
+リクエスト
+  └→ ConstraintValidator  ← ここで「存在するか」を DB 確認
+       └→ Controller
+            └→ SubscriptionService  ← ここで「在庫があるか」「有効か」を DB 確認
+```
+
+「入力検証」と「ビジネスロジック検証」の境界が曖昧になり、DB を確認する処理がレイヤーをまたいで散らばります。これが、古典的なレイヤードアーキテクチャで Bean Validation を使うときに生じる構造的な問題です。I/O を伴うバリデーションは `ConstraintValidator` に収まらず、レイヤーをまたいで散らばりやすいのです。
 
 ---
 

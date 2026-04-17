@@ -35,7 +35,7 @@ public void createSubscription(String planType, String mealSetId, String frequen
 }
 ```
 
-これが **Shotgun Parsing** アンチパターンです。呼ばれるたびに入力の正当性を確認するコードが散弾（shotgun）のように各所に散らばります。
+これが **Shotgun Parsing** アンチパターンです。呼ばれるたびに入力の正当性を確認するコードが散弾（shotgun）のように各所に散らばります。たとえば `mealSetId` が空でないことの確認だけで、Controller・Service・Repository の入口付近に同じガード節が何箇所も現れます。バリデーションルールが変わったとき、すべての箇所を探して修正しなければならず、漏れがあっても気づきにくいです。
 
 対して Always-Valid Layer の中はこうなります。
 

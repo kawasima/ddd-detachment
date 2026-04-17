@@ -9,20 +9,20 @@ Part 2・3 で個別に見てきたデコーダと状態遷移を、今度はレ
 ```text
 HTTP Request (JsonNode)
         │
-        ▼ OrderPlanDecoder（1回目の変換）
+        ▼ OrderPlanDecoder（1回目の変換：外部形式 → ドメイン型）
         │
   OrderPlan (sealed interface)   ← ここから先は「Always-Valid Layer」
         │
-        ▼ OrderController が Subscription を組み立てる（変換なし）
-        │
+        ▼ OrderController が Subscription を組み立てる
+        │   ※ OrderPlan の値はそのまま使う。新たに生成する値（ID・次回配送日）はここで作る
   Subscription.Active
         │
-        ▼ InMemorySubscriptionRepository.save()（2回目の変換）
+        ▼ SubscriptionRepository.save()（2回目の変換：ドメイン型 → 永続化形式）
         │
   永続化ストレージ（DB）
 ```
 
-変換は2回だけです。Full Mapping で現れる `CreateOrderCommand` や `OrderData` のような中間 DTO は存在しません。
+「変換」とここで指しているのは、**あるドメイン型を別のドメイン型や永続化形式に写し替える操作**です。Controller で `UUID.randomUUID()` や `LocalDate.now().plusWeeks(1)` を生成するのは「値の生成」であり、変換ではありません。`OrderPlan` から `Subscription.Active` を作るときも、`plan` をそのままフィールドに渡しているだけで、型を変換する詰め替えは発生していません。Full Mapping で現れる `CreateOrderCommand` や `OrderData` のような中間 DTO は存在しません。
 
 ## 入口：@RequestBody JsonNode
 
@@ -144,7 +144,7 @@ DB
 消えたものは何でしょうか。
 
 - `OrderForm`: Bean Validation のためのフラットなクラスです。デコーダが `JsonNode` を直接 `OrderPlan` に変換するので不要です。
-- `CreateOrderCommand`: UseCase の境界を明示するための DTO です。Controller と UseCase が同じチームの同じリポジトリにあるなら不要です（距離が近い）。
+- `CreateOrderCommand`: UseCase の境界を明示するための Local DTO です。デコーダがあれば不要になります（後述）。
 - `OrderEntity`: JPA のエンティティクラスです。jOOQ はドメインモデルから直接 DSL で SQL を発行できるので不要です。
 
 削除したのではなく、それらの役割が別の場所に吸収されました。
@@ -152,6 +152,26 @@ DB
 - `OrderForm` の役割 → `OrderPlanDecoder`（デコーダが型変換とバリデーションを担う）
 - `CreateOrderCommand` の役割 → `OrderPlan` が直接 UseCase に渡る（中間 DTO なし）
 - `OrderEntity` の役割 → `SubscriptionRepositoryImpl` 内の `switch` 式（リポジトリが永続化マッピングを担う）
+
+### なぜ `CreateOrderCommand` が不要になるのか
+
+`CreateOrderCommand` のような Local DTO（UseCase 専用の入力クラス）が生まれる根本的な理由は、**Bean Validation のバリデーション結果が型に反映されない**ことにあります。
+
+Bean Validation を通過した後のオブジェクトは `OrderPlanForm` のままです。`planType` は `String`、`mealSetId` も `String` のまま——ドメインの型（`OrderPlan`）ではありません。Controller がこの `OrderPlanForm` を UseCase に直接渡してしまうと、UseCase がプレゼンテーション層のクラス（`OrderPlanForm`）に依存することになります。それを避けるために `CreateOrderCommand` という中間の Local DTO が登場します。
+
+```text
+OrderPlanForm  →（詰め替え）→  CreateOrderCommand  →（詰め替え）→  OrderPlan
+   Controller                    Controller/UseCase境界               UseCase内
+```
+
+Raoh のデコーダは `JsonNode` を受け取り、直接 `OrderPlan` を返します。`OrderPlanForm` という中間状態が存在しないので、そもそも「プレゼンテーション層の型を UseCase に渡してしまう」という問題が起きません。デコードの結果はすでにドメイン型なので、`CreateOrderCommand` を経由する理由がなくなります。
+
+```text
+JsonNode  →（デコード）→  OrderPlan
+                           そのまま UseCase へ
+```
+
+Local DTO がなくなることで、フィールドを1つ追加したときの修正箇所が減ります。Ch 2 で示した「フィールド追加が複数クラスに波及する」問題の一因がここにあります。
 
 ---
 

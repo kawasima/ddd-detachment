@@ -15,6 +15,7 @@ title: "二つのアプローチの比較"
 | 分岐の記述 | バリデーターに1回 + コントローラーに1回 | `discriminate` に1回のみ |
 | バリデーション後の型 | `OrderPlanForm`（文字列の `planType` で判別） | `OrderPlan`（sealed interfaceの具体型） |
 | エラーパス | `addPropertyNode()` で手動構築 | 自動構成 |
+| I/O を伴う検証（DB 存在確認など） | `ConstraintValidator` 内で自前実装（Spring 管理が必要） | `flatMap(gateway::findById)` でデコーダに組み込める |
 
 ### バリデーション後の世界の違い
 
@@ -41,6 +42,40 @@ switch (plan) {
 ```
 
 新しいプランが追加されたとき（たとえば `TrialPlan` が増えたとき）を想像してください。Raoh では sealed interface に `TrialPlan` を追加した瞬間に、`switch` を書いているすべての箇所でコンパイルエラーが出ます。対応漏れをコンパイラが教えてくれます。Bean Validation ではそういった仕組みはありません。
+
+### Bean Validation で「対応漏れ」が起きるとき
+
+Bean Validation のアプローチで `TrialPlan` を追加した場合、何が起きるかをコードで確認します。
+
+バリデーターの `switch` に `"TRIAL"` の `case` を追加し忘れた場合、`default -> true` がそのリクエストを素通りさせます。
+
+```java
+// バリデーター（TrialPlan の case を追加し忘れた）
+return switch (form.getPlanType()) {
+    case "STANDARD" -> validateStandard(form, context);
+    case "PREMIUM"  -> validatePremium(form, context);
+    case "CUSTOM"   -> validateCustom(form, context);
+    default -> true;  // ← "TRIAL" が来ても検証なしで通過してしまう
+};
+```
+
+バリデーターをすり抜けた `"TRIAL"` は、コントローラーの `switch` に到達します。こちらに `case "TRIAL"` を追加していれば問題ありませんが、両方を追加し忘れていると次のような流れになります。
+
+```java
+// コントローラー（こちらも TrialPlan の case を追加し忘れた）
+OrderPlan plan = switch (form.getPlanType()) {
+    case "STANDARD" -> new StandardPlan(...);
+    case "PREMIUM"  -> new PremiumPlan(...);
+    case "CUSTOM"   -> new CustomPlan(...);
+    default -> throw new IllegalStateException("unreachable");
+    // ↑ バリデーターが true を返したので "TRIAL" がここに到達し、
+    //   本番環境で初めて IllegalStateException が投げられる
+};
+```
+
+この2つの `switch` はどちらも文法的に正しいJavaコードです。バリデーターが `true` を返すのも、コントローラーが例外を投げるのも、どちらも「コードとして問題がない」状態です。**コンパイラはこの対応漏れを検出できません。** `TrialPlan` のリクエストが届くまで、このバグはテストをくぐり抜けて本番環境に潜伏します。バリデーターを追加した開発者とコントローラーを修正した開発者が別であれば、なおさら気づきにくくなります。
+
+Raoh では、`sealed interface OrderPlan` に `permits TrialPlan` を追加した瞬間、`switch (plan)` を書いているすべての箇所が `case TrialPlan` を要求するコンパイルエラーを出します。「新しいプランを追加するとき、対応が必要な場所をコンパイラが教えてくれる」——この違いは、プランの種類が増えるほど大きくなります。
 
 ## Bean Validation が適している場面
 
