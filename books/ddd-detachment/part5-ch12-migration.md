@@ -146,10 +146,8 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
 Controller を `@Valid @RequestBody OrderPlanForm` から `@RequestBody JsonNode` に切り替えると、Spring MVC の既定の動きがいくつか変わります。移行時に踏みやすい落とし穴を整理します。
 
 - **バリデーションエラーのハンドラが発火しなくなる**: `@Valid` が外れるため、`MethodArgumentNotValidException` を前提にした既存の `@ControllerAdvice` はこのエンドポイントでは発火しません。代わりに、Raoh の `Err` を HTTP エラーに変換する処理を各 Controller に書くか、共通化する必要があります。また「そもそも JSON として解釈できない」リクエストには `HttpMessageNotReadableException` が出ます。これは 3 章「JSON として解釈できないリクエスト」を参照してください。**3種類のエラー形式（既存の Bean Validation エラー、Raoh の Err、JSON 解析失敗）が混在するため、クライアントに返す JSON スキーマを統一する工夫が必要です。** 最もシンプルな対処は、`@ControllerAdvice` で各例外を共通のエラー DTO に変換することです。例えば `MethodArgumentNotValidException`・`Err`・`HttpMessageNotReadableException` をすべて `{ "errors": [{ "field": "...", "message": "..." }] }` の形に正規化するハンドラを1つ用意すれば、クライアントは形式を気にせず処理できます。移行完了後は Bean Validation のハンドラを削除できます。
-- **OpenAPI/springdoc のスキーマ自動生成が効かなくなる**: springdoc は Bean Validation のアノテーションとフォームクラスのフィールドを走査してスキーマを生成します。`@RequestBody JsonNode` にするとスキーマが空、あるいは `object` としか出ません。`OrderPlan` の sealed 階層から OpenAPI ドキュメントを作るには、`@Schema` を手書きするか、ドキュメント専用の DTO（Form クラスを残しつつ Controller では使わない）を別途用意する方法があります。
-- **フロントエンド向けコード生成への影響**: `openapi-generator` などで TypeScript 型を生成している場合、スキーマの欠落は生成コードの欠落につながります。移行を段階的に進めるときは、**API ドキュメント側が遅れないように** 生成設定を見直してください。
 
-これらは「Raoh デコーダを導入すると自動的にきれいになる」わけではありません。Spring MVC の既定機能が Bean Validation を前提に組まれているため、代替手段を用意する手間が一時的に増えます。導入の効果（フォームクラスと `ConstraintValidator` の削除）とこれらのコストを天秤にかけて、移行範囲を決めてください。
+「Raoh デコーダを導入すると自動的にきれいになる」わけではありません。Spring MVC の既定機能が Bean Validation を前提に組まれているため、代替手段を用意する手間が一時的に増えます。導入の効果（フォームクラスと `ConstraintValidator` の削除）とこのコストを天秤にかけて、移行範囲を決めてください。
 
 ---
 
