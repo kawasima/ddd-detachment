@@ -111,7 +111,7 @@ case Subscription.Active a -> jooq.insertInto(SUBSCRIPTIONS)
 
 ## Part 1 の構成との対比
 
-Ch 1 で示した Full Mapping の構成と比較します。
+1章で示した Full Mapping の構成と比較します。
 
 ```text
 【Full Mapping】
@@ -171,7 +171,7 @@ JsonNode  →（デコード）→  OrderPlan
                            そのまま UseCase へ
 ```
 
-Local DTO がなくなることで、フィールドを1つ追加したときの修正箇所が減ります。Ch 2 で示した「フィールド追加が複数クラスに波及する」問題の一因がここにあります。
+Local DTO がなくなることで、フィールドを1つ追加したときの修正箇所が減ります。2章で示した「フィールド追加が複数クラスに波及する」問題の一因がここにあります。
 
 ---
 
