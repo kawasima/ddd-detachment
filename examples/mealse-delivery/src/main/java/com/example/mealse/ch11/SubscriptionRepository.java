@@ -23,6 +23,18 @@ public interface SubscriptionRepository {
     void save(Subscription subscription);
 
     /**
+     * Finds a subscription by its ID regardless of status.
+     *
+     * <p>The returned value is a sealed {@link Subscription}, so callers can pattern-match
+     * on {@link Subscription.Active} / {@link Subscription.Suspended} with
+     * compile-time exhaustiveness checking.</p>
+     *
+     * @param id the subscription ID
+     * @return the subscription, or empty if not found
+     */
+    Optional<Subscription> findById(SubscriptionId id);
+
+    /**
      * Finds an active subscription by its ID.
      *
      * @param id the subscription ID
