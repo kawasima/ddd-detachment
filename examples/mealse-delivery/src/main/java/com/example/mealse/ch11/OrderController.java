@@ -9,6 +9,8 @@ import net.unit8.raoh.Err;
 import net.unit8.raoh.Ok;
 import net.unit8.raoh.Result;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,21 +18,24 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Controller that handles order creation requests.
+ * Controller that handles order creation and retrieval requests.
  *
  * <p>This class demonstrates the complete flow described in Chapter 11:</p>
  * <ol>
  *   <li>Receive {@code JsonNode} from the HTTP request body</li>
  *   <li>Decode it into a typed domain model using {@link OrderPlanDecoder}</li>
  *   <li>Pass the domain model directly to the repository (no intermediate DTO)</li>
+ *   <li>Encode the domain model back into a {@code Map<String, Object>} response
+ *       using {@link SubscriptionEncoder}</li>
  * </ol>
  *
- * <p>Because the decoder returns either a typed {@link OrderPlan} or structured errors,
- * there is no separate validation step. The domain object is always valid by the time
- * it reaches the repository.</p>
+ * <p>The input and output sides are symmetric: decoders convert external
+ * representations into domain types, encoders convert domain types into external
+ * representations. No intermediate request or response DTO classes are needed.</p>
  */
 @RestController
 @RequestMapping("/orders")
@@ -41,7 +46,7 @@ public class OrderController {
     /**
      * Creates a new {@code OrderController}.
      *
-     * @param subscriptionRepository the repository used to persist subscriptions
+     * @param subscriptionRepository the repository used to persist and retrieve subscriptions
      */
     public OrderController(SubscriptionRepository subscriptionRepository) {
         this.subscriptionRepository = subscriptionRepository;
@@ -51,12 +56,14 @@ public class OrderController {
      * Creates a new subscription from the given order request.
      *
      * <p>The request body is decoded directly into an {@link OrderPlan} using the
-     * Raoh decoder. If decoding fails (invalid planType, missing fields, etc.),
-     * a 400 response is returned with structured error information.
-     * If decoding succeeds, a {@link Subscription.Active} is created and persisted.</p>
+     * Raoh decoder. If decoding fails, a 400 response is returned with structured
+     * error information. If decoding succeeds, a {@link Subscription.Active} is
+     * created, persisted, and encoded back into a {@code Map<String, Object>} for
+     * the response body.</p>
      *
      * @param body the raw JSON request body
-     * @return 201 Created on success, 400 Bad Request on validation failure
+     * @return 201 Created with the encoded subscription on success,
+     *         400 Bad Request with the issues on validation failure
      */
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody JsonNode body) {
@@ -73,11 +80,31 @@ public class OrderController {
                         LocalDate.now().plusWeeks(1)
                 );
                 subscriptionRepository.save(subscription);
-                yield ResponseEntity.status(201).build();
+                Map<String, Object> responseBody =
+                        SubscriptionEncoder.SUBSCRIPTION_ENCODER.encode(subscription);
+                yield ResponseEntity.status(201).body(responseBody);
             }
             case Err<OrderPlan> err ->
                     ResponseEntity.badRequest().body(err.issues());
         };
+    }
+
+    /**
+     * Retrieves a subscription by ID.
+     *
+     * <p>The domain model is encoded into a {@code Map<String, Object>} for the
+     * response body. No separate response DTO class is defined; the encoder
+     * describes the output shape declaratively.</p>
+     *
+     * @param id the subscription ID
+     * @return 200 OK with the encoded subscription, or 404 Not Found
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getOrder(@PathVariable String id) {
+        return subscriptionRepository.findById(new SubscriptionId(id))
+                .<ResponseEntity<?>>map(subscription ->
+                        ResponseEntity.ok(SubscriptionEncoder.SUBSCRIPTION_ENCODER.encode(subscription)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     private UserId extractUserId(JsonNode body) {

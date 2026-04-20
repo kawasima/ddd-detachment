@@ -83,6 +83,19 @@ public class InMemorySubscriptionRepository implements SubscriptionRepository {
     }
 
     @Override
+    public Optional<Subscription> findById(SubscriptionId id) {
+        SubscriptionRow row = store.get(id.value());
+        if (row == null) {
+            return Optional.empty();
+        }
+        return switch (row.status()) {
+            case "ACTIVE"    -> Optional.of(toActive(row));
+            case "SUSPENDED" -> Optional.of(toSuspended(row));
+            default -> throw new IllegalStateException("Unknown status: " + row.status());
+        };
+    }
+
+    @Override
     public Optional<Subscription.Active> findActive(SubscriptionId id) {
         SubscriptionRow row = store.get(id.value());
         if (row == null || !"ACTIVE".equals(row.status())) {
