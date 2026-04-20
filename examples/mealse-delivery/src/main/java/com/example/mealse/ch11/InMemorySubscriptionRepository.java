@@ -91,7 +91,7 @@ public class InMemorySubscriptionRepository implements SubscriptionRepository {
         return switch (row.status()) {
             case "ACTIVE"    -> Optional.of(toActive(row));
             case "SUSPENDED" -> Optional.of(toSuspended(row));
-            default -> throw new IllegalStateException("Unknown status: " + row.status());
+            default -> Optional.empty();  // 未知の status は見つからなかったものとして扱う
         };
     }
 

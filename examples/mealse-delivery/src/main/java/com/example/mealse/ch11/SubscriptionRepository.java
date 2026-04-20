@@ -2,7 +2,6 @@ package com.example.mealse.ch11;
 
 import com.example.mealse.domain.Subscription;
 import com.example.mealse.domain.SubscriptionId;
-import com.example.mealse.domain.UserId;
 
 import java.util.Optional;
 
