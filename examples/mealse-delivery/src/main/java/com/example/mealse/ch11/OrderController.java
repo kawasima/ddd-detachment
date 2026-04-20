@@ -97,11 +97,19 @@ public class OrderController {
      * describes the output shape declaratively.</p>
      *
      * @param id the subscription ID
-     * @return 200 OK with the encoded subscription, or 404 Not Found
+     * @return 200 OK with the encoded subscription, 400 Bad Request for an invalid ID,
+     *         or 404 Not Found
      */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getOrder(@PathVariable String id) {
-        return subscriptionRepository.findById(new SubscriptionId(id))
+    public ResponseEntity<?> getOrder(@PathVariable("id") String id) {
+        final SubscriptionId subscriptionId;
+        try {
+            subscriptionId = new SubscriptionId(id);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        return subscriptionRepository.findById(subscriptionId)
                 .<ResponseEntity<?>>map(subscription ->
                         ResponseEntity.ok(SubscriptionEncoder.SUBSCRIPTION_ENCODER.encode(subscription)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
