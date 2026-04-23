@@ -1,0 +1,18 @@
+title: "ソフトウェア唯識論"
+summary: "唯識思想（八識・三性・種子薫習・転識得智）をソフトウェア設計の読み解き枠組みとして使う試みです。前五識・第六意識・末那識・阿頼耶識の各層をセンサー／モデリング／バイアス／状態管理に対応させ、「なぜ認識がズレるのか」「チームの共通理解はどう形成されるか」を問い直します。唯識の哲学的背景から丁寧に説明するため、仏教の予備知識は不要です。"
+topics: ["設計", "アーキテクチャ", "ドメインモデリング", "哲学"]
+published: false
+price: 0
+chapters:
+  - ch01_world_reflected
+  - ch02_overview
+  - ch03_five_senses
+  - ch04_sixth_consciousness
+  - ch05_manas
+  - ch06_alaya
+  - ch07_three_natures
+  - ch08_seeds_and_perfuming
+  - ch09_four_aspects
+  - ch10_transformation
+  - ch11_practice
+  - ch12_epilogue
