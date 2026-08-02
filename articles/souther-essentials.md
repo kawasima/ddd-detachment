@@ -10,9 +10,9 @@ Javaでドメインモデルを素直に表そうとすると、型が増えま�
 
 問題は、それらが規約にとどまることです。検証を通らない構築経路を残すことも、業務上の却下を例外で返すことも、業務ロジックから直接データベースへ触ることもできます。設計を守るには、実装者が毎回同じ判断をしなければなりません。
 
-@[card](https://github.com/kawasima/souther)
+@[card](https://github.com/souther-lang/souther)
 
-[Souther](https://github.com/kawasima/souther) は、業務上の概念を型にするコストを下げながら、こうした規約を言語の制約として扱うために作った小さなJVM言語です。業務データ、値の制約、状態遷移、外界への依存を `.sou` ファイルに記述し、Javaから利用できる型と振る舞いへコンパイルします。
+[Souther](https://github.com/souther-lang/souther) は、業務上の概念を型にするコストを下げながら、こうした規約を言語の制約として扱うために作った小さなJVM言語です。業務データ、値の制約、状態遷移、外界への依存を `.sou` ファイルに記述し、Javaから利用できる型と振る舞いへコンパイルします。
 
 型を追加するたびにJava側の定型的な実装を増やすのではなく、誰が値を構築できるか、どの結果を後段へ渡すか、どこから外界へ出られるかまでを `.sou` ファイルの中で決めます。
 
@@ -20,7 +20,7 @@ Javaでドメインモデルを素直に表そうとすると、型が増えま�
 
 ## Southerとは
 
-説明より先に、実物を見てもらうのが早いと思います。冒頭に挙げた出張申請の困りごとを、Southerではこう書きます（リポジトリの [examples/businesstrip](https://github.com/kawasima/souther/tree/main/examples/businesstrip) を基にしています）。
+説明より先に、実物を見てもらうのが早いと思います。冒頭に挙げた出張申請の困りごとを、Southerではこう書きます（[examplesリポジトリ](https://github.com/souther-lang/examples)の [businesstrip](https://github.com/souther-lang/examples/tree/main/businesstrip) を基にしています）。
 
 ```elm
 module example.trip
@@ -49,7 +49,7 @@ behavior submit : (request: DraftRequest, submittedAt: String) -> Submitted | Re
     constructs Submitted, Rejected
 
 let submit (request, submittedAt) = {
-    require request.plannedCost.value <= 100000 else Rejected { reason = "high_cost" }
+    guard request.plannedCost.value <= 100000 else Rejected { reason = "high_cost" }
     Submitted { ...request, submittedAt = submittedAt }
 }
 ```
@@ -71,10 +71,10 @@ let submit (request, submittedAt) = {
 - JDK 25
 - Maven
 
-コンパイラはJDKのClass-File APIを使っています。生成される `.class` はJava 21以降で動きます。
+コンパイラはJDKのClass-File APIを使っています。生成される `.class` とランタイムはJava 25のクラスファイルバージョンで出力されるため、利用する側のアプリケーションの実行にもJava 25以降が必要です。
 
 ```bash
-git clone https://github.com/kawasima/souther.git
+git clone https://github.com/souther-lang/souther.git
 cd souther
 mvn install
 ```
@@ -84,6 +84,8 @@ mvn install
 ```bash
 mvn -pl souther-cli -am -DskipTests install
 ```
+
+Windowsではこの実行ファイル形式が動かないので、`java -jar souther-cli/target/souther.jar` として使います。
 
 ## Hello, world
 
@@ -107,7 +109,7 @@ let greet (name) = "Hello, " ++ name
 - 実行可能なbehaviorがファイルに1つだけなら `--behavior` は省略できます
 - 引数のないbehaviorでは `--input` も不要です
 - 複数引数はJSON配列で渡します（`--input '[3, 7]'`）
-- `run` で動かせるのは `let` を持つ自己完結のbehaviorだけです。外界依存を注入するbehaviorや `>->` のパイプラインは、理由付きで拒否されます
+- `run` で動かせるのは、`let` を持ち外界依存のない自己完結のbehaviorです。`>->` のパイプラインも、全ステージがこの意味で自己完結なら動かせます。外界依存を注入するbehaviorと、それを含むパイプラインは、理由付きで拒否されます
 
 ## data で業務データを定義する
 
@@ -140,7 +142,7 @@ data Submitted =
 
 複数の可能性は `|` で表します。`Submitted | Rejected` は、Javaでいえば複数のrecordが同じsealed interfaceを実装している構造に近いのですが、後述の通り `Result` のようなコンテナには包まれません。
 
-ちなみに識別子には日本語が使えます。リポジトリの examples/businesstrip は `data 従業員ID = String` のように書かれていて、ユビキタス言語を翻訳せず型名にできます。仕様書とコードの対応表を頭の中に持たなくてよくなるので、業務システムではこちらが本領だと思っています。
+ちなみに識別子には日本語が使えます。examplesリポジトリの businesstrip は `data 従業員ID = String` のように書かれていて、ユビキタス言語を翻訳せず型名にできます。仕様書とコードの対応表を頭の中に持たなくてよくなるので、業務システムではこちらが本領だと思っています。
 
 ## invariant で不正な値を作らせない
 
@@ -172,7 +174,7 @@ behavior submit : (request: DraftRequest, submittedAt: String) -> Submitted | Re
     constructs Submitted, Rejected
 
 let submit (request, submittedAt) = {
-    require request.plannedCost.value <= 100000 else Rejected { reason = "high_cost" }
+    guard request.plannedCost.value <= 100000 else Rejected { reason = "high_cost" }
     Submitted { ...request, submittedAt = submittedAt }
 }
 ```
@@ -181,7 +183,7 @@ let submit (request, submittedAt) = {
 
 `let` は、そのbehaviorにSoutherで書いた関数本体をバインドします。`let` のないbehaviorはSouther内に実装を持たず、Javaから実装を注入します。
 
-`require ... else ...` は事前条件チェックというより業務上の分岐です。条件を満たさないとき、例外を投げるのではなく `Rejected` という通常の値を返します。
+`guard ... else ...` は事前条件チェックというより業務上の分岐です。条件を満たさないとき、例外を投げるのではなく `Rejected` という通常の値を返します。
 
 ## 業務上の失敗を例外にしない
 
@@ -191,7 +193,7 @@ let submit (request, submittedAt) = {
 
 ## >-> による型ルーティング
 
-behavior同士は `>->` で合成できます。会員を検索し、見つかった会員だけを表示用データへ変換する例です（examplesの `member` モジュールを単純化しています）。
+behavior同士は `>->` で合成できます。会員を検索し、見つかった会員だけを表示用データへ変換する例です（examplesリポジトリの `member` モジュールを単純化しています）。
 
 ```elm
 behavior findMember : (id: MemberId) -> Member | MemberNotFound | InvalidStoredData
@@ -204,27 +206,25 @@ behavior findAndFormatMember = findMember >-> formatMember
 
 `findMember` の結果のうち、後段の入力型 `Member` に一致するものだけが `formatMember` へ渡ります。`MemberNotFound` と `InvalidStoredData` は後段の入力型に一致しないため、そのまま最終出力へ流れます。「成功値だけをbindする」固定モデルではなく、どのケースを次へ渡すかは後段の入力型で決まる。成功・失敗ではなく型によるルーティングです。
 
-この性質はトランザクション制御とも噛み合います。examplesの `ordering` では、在庫不足が例外ではなく値として返ってくるので、コントローラは出力ケースの `switch` でHTTPステータスを決めながら `setRollbackOnly()` を呼ぶだけです。DBダウンのようなプラットフォーム障害はドメインの帰結ではないためケースにはせず、Java実装が投げた例外をSoutherは素通しし、`TransactionTemplate` の自動ロールバックに乗ります。業務の失敗とインフラの障害が構造として分離されているわけです。
+この性質はトランザクション制御とも噛み合います。examplesリポジトリの `ordering` では、在庫不足が例外ではなく値として返ってくるので、コントローラは出力ケースの `switch` でHTTPステータスを決めながら `setRollbackOnly()` を呼ぶだけです。DBダウンのようなプラットフォーム障害はドメインの帰結ではないためケースにはせず、Java実装が投げた例外をSoutherは素通しし、`TransactionTemplate` の自動ロールバックに乗ります。業務の失敗とインフラの障害が構造として分離されているわけです。
 
 ## 外部依存は Java から注入する
 
-データベース、HTTP、ファイル、時計、ID生成器は、Southerから直接呼び出しません。実装を持たないbehaviorとして宣言し、Javaから注入します。
+データベース、HTTP、ファイル、時計、ID生成器は、Southerから直接呼び出しません。実装を持たないbehaviorとして宣言し、Javaから注入します。`DateTime` はISO 8601の日時を表す組み込み型ですが、現在時刻を取得する手段は言語内にありません。
 
 ```elm
-data DateTime = String
-
 // 実装を書かない behavior は Java から注入される
 behavior currentTime : () -> DateTime
 
-// requires で外界依存を明示する
+// depends on で外界依存を明示する
 behavior approve : (request: AwaitingApproval) -> Approved
-    requires currentTime
+    depends on currentTime
     constructs Approved
 ```
 
 一見不便ですが、目的は明確で、業務計算のどこが外界に触れているかを言語レベルで追跡可能にするためです。
 
-`requires` のないbehaviorは、同じ入力に対して同じ結果を返す計算として閉じています。データベースアクセスや現在時刻の取得が必要になると、その依存がbehaviorの宣言に現れます。Southerは汎用的なエフェクトシステムを持ちませんが、業務モデルで必要になる外界との接点だけを `requires` で追跡します。
+`depends on` のないbehaviorは、同じ入力に対して同じ結果を返す計算として閉じています。データベースアクセスや現在時刻の取得が必要になると、その依存がbehaviorの宣言に現れます。Southerは汎用的なエフェクトシステムを持ちませんが、業務モデルで必要になる外界との接点だけを `depends on` で追跡します。
 
 Flix のようにIOなどの副作用を型へ注釈するのではなく、Southerでは外界に触れる処理そのものをbehaviorとして宣言し、Javaから注入します。
 
@@ -236,7 +236,60 @@ decoderやencoderを手書きする記法はそもそもありません。デー
 - レコードはフィールド名をキーとするJSONオブジェクト
 - 直和は `type` フィールドを判別子に、ケース名をタグにする
 
-decoderが不正な外部入力を受け取ると、境界用の `Result` が返ります。これはbehaviorの業務結果とは別物です。decoderの `Result` はJSONの形式不正や制約違反という境界の問題を表し、behaviorの直和は業務上の帰結を表します。両者を同じ「失敗」に混ぜないことが設計の要点です。キー名のカスタマイズや正規化が必要なら、それは境界（Java側）の仕事という割り切りです。
+例外が1つあり、全ケースがフィールドを持たない直和は列挙として扱われ、`type` を持つオブジェクトではなくケース名の裸の文字列になります。JSONオブジェクトのキーには文字列しか置けないので、こうした直和を `Map` のキーに使えるようにするためです。
+
+decoderが不正な外部入力を受け取ると、境界用の `Result` が返ります。実体は導出コードが使うランタイムライブラリ [Raoh](https://github.com/kawasima/raoh) の `Result` で、独立したフィールドのエラーは1つずつではなくまとめて報告されます。これはbehaviorの業務結果とは別物です。decoderの `Result` はJSONの形式不正や制約違反という境界の問題を表し、behaviorの直和は業務上の帰結を表します。両者を同じ「失敗」に混ぜないことが設計の要点です。キー名のカスタマイズや正規化が必要なら、それは境界（Java側）の仕事という割り切りです。
+
+## invariant はコンパイル時にも検査される
+
+invariantの検査は実行時だけではありません。コンパイラはbehaviorの本体を読み、構築のたびに「この場所でinvariantは成り立つか」を確かめます。残高からの引き出しで見ます。
+
+```elm
+data Money = Decimal
+    invariant value >= 0m
+
+data WithdrawRequest = { balance: Money, amount: Money }
+
+behavior withdraw : (req: WithdrawRequest) -> Money | InsufficientBalance
+    constructs InsufficientBalance
+
+let withdraw (req) = {
+    guard req.amount <= req.balance else InsufficientBalance
+    req.balance - req.amount
+}
+```
+
+先に前提から。newtypeには `+` と `-` の算術があり、`Money - Money` は `Money` のままです。演算子は包んだ値を開いて計算し、結果を包み直すので、そこでinvariantが再検査されます。残高を超える引き出しは、負の `Money` を作ろうとした時点でドメイン内のバグとして扱われます。なお、この包み直しは新しい構築経路ではないので、`constructs` に `Money` を書く必要はありません（書くと過剰宣言の警告が出ます）。
+
+このコードが警告なしで通るのは、`guard req.amount <= req.balance` が減算の非負を証明しているからです。コンパイラはguardで確定した条件を集め、`req.balance - req.amount` が `Money` のinvariantを満たすことを構築の場所ごとに確認します。試しにguardの行を消すと、こう警告されます。
+
+```
+warning: Constructing `Money` here may violate its invariant: the guards do not establish it.
+```
+
+さらに、到達可能なパスで必ず破れる構築は警告ではなくコンパイルエラーです。定数の `Money(-5)` を弾くチェックが、パス単位に一般化されているわけです。
+
+この証明は外部のSMTソルバではなく、区間と差分（`value >= c` や `a <= b` の形）に限った決定手続きで行われます。手続きの範囲外にあるinvariant（非線形な関係など）は黙って実行時検査に残り、どのguardを書いても消えない警告は出ません。何が証明でき何ができないかは、仕様書に明記されています。
+
+guardでルールを再記述したくないときは、構築を試行する書き方もあります。条件の位置に構築と `as` を書くと、その型のinvariantが分岐を決めます。
+
+```elm
+data Reason = String
+
+data NotConverted = { reason: List<Reason> }
+    invariant hasReason = List.length(reason) >= 1
+
+behavior convert : (reasons: List<Reason>) -> NotConverted | Converted
+    constructs NotConverted, Converted
+
+let convert (reasons) = {
+    if NotConverted { reason = reasons } as blocked
+        then blocked
+        else Converted
+}
+```
+
+invariantが成り立てば値が作られ、`blocked` という名前で成功側だけから使えます。破れたら `else` 側へ抜け、値は作られず、アボートも起きません。「阻害理由が1件以上ある」というルールは `NotConverted` のinvariantに一度書かれるだけで、guardに再掲されません。invariantの節には `hasReason` のように名前を付けられます。名前は破れた節ごとに `else` を出し分ける形で使えるほか、decoderのエラー報告にも現れます。
 
 ## example はコンパイル時に検査される
 
@@ -256,7 +309,16 @@ exampleはコンパイル時に評価され、期待した結果と一致しな�
 
 従来は、同じ知識が仕様書の記述、テストケース一覧、テストコードの3か所にあり、仕様変更のたびに3つを同期させる必要がありました。exampleでは境界値（100000と100001）とその帰結がbehaviorと同じファイルにあり、同期の作業そのものがありません。上限ちょうどが通るかどうかも、このファイルを見れば分かります。
 
-記述に必要なものも少なく、テストフレームワークもモックもsetupメソッドも使いません。入力は通常の構築経路を通るため、invariantに反するテストデータはそれ自体がビルドエラーになり、不正なテストデータのままテストが通ることはありません。
+記述に必要なものも少なく、テストフレームワークもモックもsetupメソッドも使いません。入力は通常の構築経路を通るため、invariantに反するテストデータはそれ自体がビルドエラーになり、不正なテストデータのままテストが通ることはありません。exampleが増えてきたら、`examples for` で対象モジュールを名指しした付属ファイルへexampleだけを移すこともできます。
+
+外界依存を持つbehaviorのexampleも書けます。`depends on` に挙がった依存には、`fake` で代役を立てます。
+
+```elm
+fake currentTime
+    | _ -> DateTime("2026-07-20T09:00:00")
+```
+
+これで「外部依存は Java から注入する」で見た `approve` のように、`depends on currentTime` を持つbehaviorにもいつも通りのexampleを書けます。fakeはパターンマッチなので、入力によって応答を変えるDB検索の代役も1つで書けます。examplesリポジトリの member では、重複したメールアドレスのときだけ既存会員を返す `findByEmail` のfakeを立てて、登録の重複チェックのexampleを通しています。fakeが評価されるのはexampleのコンパイル時だけで、実行時クラスは生成されず、exampleと同じくjarには何も残りません。
 
 位置づけとしては、Cucumberなどの「例で仕様を語る」アプローチを、グルーコードなしで言語機能にしたものに近いです。ユニットテストを全面的に置き換えるものではありませんが、仕様上重要な境界値とbehaviorの対応を、実装と乖離しない形で保てます。
 
@@ -275,14 +337,23 @@ exampleはコンパイル時に評価され、期待した結果と一致しな�
   <artifactId>maven-compiler-plugin</artifactId>
   <configuration>
     <annotationProcessorPaths>
-      <path>net.unit8.souther:souther-compiler:0.1.0-SNAPSHOT</path>
+      <path>
+        <groupId>org.souther-lang</groupId>
+        <artifactId>souther-compiler</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+      </path>
+      <path>
+        <groupId>org.souther-lang</groupId>
+        <artifactId>souther-runtime</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+      </path>
     </annotationProcessorPaths>
     <compilerArgs><arg>-Asouther.source=${project.basedir}/src/main/souther</arg></compilerArgs>
   </configuration>
 </plugin>
 ```
 
-`src/main/souther/` に `.sou` を置いて `mvn compile` すると、生成クラスが `target/classes` に出力され、手書きのJavaが同じコンパイルの中でその生成型を参照できます。`souther-compiler` はプロセッサパスに載るだけで、アプリの依存にも成果物のjarにも入りません。なお、Javaソースが1つもないとjavacがアノテーション処理を始めないため、サンプルでは最小の `package-info.java` を置いています。
+`src/main/souther/` に `.sou` を置いて `mvn compile` すると、生成クラスが `target/classes` に出力され、手書きのJavaが同じコンパイルの中でその生成型を参照できます。`souther-compiler` はプロセッサパスに載るだけで、アプリの依存には入りません。一方、生成コードが参照する `org.souther-lang:souther-runtime` と、導出されたdecoder/encoderが呼ぶ `net.unit8.raoh:raoh` は、通常の依存としてアプリに追加します。なお、Javaソースが1つもないとjavacがアノテーション処理を始めないため、サンプルでは最小の `package-info.java` を置いています。
 
 Java APIからコンパイラを呼ぶこともできます。
 
@@ -291,23 +362,25 @@ Map<String, byte[]> classes = Compiler.compile(source);
 Map<String, byte[]> linked = Compiler.compileModules(List.of(employeeSource, tripSource));
 ```
 
-Spring Boot + jOOQ でHTTPからH2まで実際に通す例が examples にあります。
+Spring Boot + jOOQ でHTTPからH2まで実際に通す例が [examplesリポジトリ](https://github.com/souther-lang/examples)にあります。境界はJavaに限らず、KotlinやClojure（Pedestal）から生成型を使う例もあります。
 
 ## 意図的に持たない機能
 
 Southerは、JVM上で動く小さな汎用言語を目指しているわけではありません。業務データの構築、値の制約、状態遷移、外界への依存を一つのモデルに収めるために、必要な機能だけを持たせています。
 
-Southerにあるのは、不変の直積・直和・単位data、`List<T>`、`Map<String, T>`、optional（`T?`）、`invariant`、`match`、`let`、`if`、`require`、レコードリテラルとspread、`behavior` と `requires` / `constructs`、`>->`、decoder/encoderの導出、`exposing` / `import` を持つモジュール。これだけです。
+Southerにあるのは、不変の直積・直和・単位data、`List<T>`、`Map<String, T>`、`Set<T>`、optional（`T?`）、`invariant`、`match`、`let`、`if`、`guard`、リスト内包表記、newtypeの `+` / `-` 算術（結果の構築時にinvariantを再検査します）、レコードリテラルとspread、`behavior` と `depends on` / `constructs`、`>->` と値パイプ `|>`、再帰（全域性が検査され、示せないものは `partial` でオプトアウトします）、`example` とその `fake`、decoder/encoderの導出、`exposing` / `import` を持つモジュール。これだけです。
 
 そして次のものがありません。
 
 - 例外
 - `null`
 - 可変状態
-- 非同期実行
+- スレッドと非同期実行
+- 継承
+- リフレクション
 - 任意のJVM API呼び出し
 
-実装が追いついていない一覧ではなく、対象範囲を守るための除外です。任意のJava APIを呼べるようにすると `requires` を通さずに時刻やDBへ触れてしまい、外界依存を追跡する設計が崩れます。例外を入れると、behaviorの戻り値に現れない脱出経路が生まれ、型に書かれた業務結果だけを見ても全帰結を把握できなくなります。機能の少なさが目的なのではなく、構築経路・値制約・依存経路を型と構文の範囲で閉じるための制限です。
+実装が追いついていない一覧ではなく、対象範囲を守るための除外です。任意のJava APIを呼べるようにすると `depends on` を通さずに時刻やDBへ触れてしまい、外界依存を追跡する設計が崩れます。例外を入れると、behaviorの戻り値に現れない脱出経路が生まれ、型に書かれた業務結果だけを見ても全帰結を把握できなくなります。機能の少なさが目的なのではなく、構築経路・値制約・依存経路を型と構文の範囲で閉じるための制限です。
 
 ## Javaアプリケーションのどこで使うか
 
