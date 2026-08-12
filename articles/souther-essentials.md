@@ -66,26 +66,27 @@ let submit (request, submittedAt) = {
 
 中心にあるのは、業務モデルの内部と外界との境界を非対称にする設計です。JavaはSoutherが生成した型やbehaviorを利用できますが、Southerから任意のJava APIを直接呼ぶことはできません。この制約が、データベースアクセスや現在時刻の取得が純粋な業務計算へ無秩序に入り込むのを防ぎます。
 
-## 必要な環境
+## インストール
 
-- JDK 25
-- Maven
+必要なのはJDK 25です。コンパイラはJDKのClass-File APIを使っていて、生成される `.class` とランタイムはJava 25のクラスファイルバージョンで出力されるため、利用する側のアプリケーションの実行にもJava 25以降が必要です。
 
-コンパイラはJDKのClass-File APIを使っています。生成される `.class` とランタイムはJava 25のクラスファイルバージョンで出力されるため、利用する側のアプリケーションの実行にもJava 25以降が必要です。
-
-```bash
-git clone https://github.com/souther-lang/souther.git
-cd souther
-mvn install
-```
-
-単一の `.sou` を試すだけならCLIが手軽です。コンパイラ・ランタイム・依存を一つにまとめた自己完結の実行ファイルが `souther-cli/target/souther` にできます。
+macOSならHomebrewでインストールできます。
 
 ```bash
-mvn -pl souther-cli -am -DskipTests install
+brew install souther-lang/souther/souther
 ```
 
-Windowsではこの実行ファイル形式が動かないので、`java -jar souther-cli/target/souther.jar` として使います。
+それ以外の環境では[GitHub Releases](https://github.com/souther-lang/souther/releases)から `souther` をダウンロードしてください。
+
+```bash
+mkdir -p ~/.local/bin
+curl -L -o ~/.local/bin/souther \
+  https://github.com/souther-lang/souther/releases/download/v0.1.0-rc4/souther
+chmod +x ~/.local/bin/souther
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Windowsではこの実行ファイル形式が動かないので、同じリリースの `souther.jar` を `java -jar souther.jar` として使います。
 
 ## Hello, world
 
@@ -100,7 +101,7 @@ let greet (name) = "Hello, " ++ name
 実行します。入力はJSONで渡し、結果もJSONで出力されます。
 
 ```bash
-./souther-cli/target/souther run hello.sou --behavior greet --input '"world"'
+souther run hello.sou --behavior greet --input '"world"'
 # => "Hello, world"
 ```
 
@@ -320,14 +321,58 @@ fake currentTime
 
 これで「外部依存は Java から注入する」で見た `approve` のように、`depends on currentTime` を持つbehaviorにもいつも通りのexampleを書けます。fakeはパターンマッチなので、入力によって応答を変えるDB検索の代役も1つで書けます。examplesリポジトリの member では、重複したメールアドレスのときだけ既存会員を返す `findByEmail` のfakeを立てて、登録の重複チェックのexampleを通しています。fakeが評価されるのはexampleのコンパイル時だけで、実行時クラスは生成されず、exampleと同じくjarには何も残りません。
 
+実装をまだ書いていないbehaviorにもexampleを書けます。引数の数、導出されたdecoderを通した入力の構築、期待している結果がそのbehaviorの出力ケースにあるかどうかは、実装がなくても検査されます。既存システムから集めた実データを、モデルの外のスプレッドシートではなく `.sou` の中に、invariantを通した状態で置いておけるということです。
+
 位置づけとしては、Cucumberなどの「例で仕様を語る」アプローチを、グルーコードなしで言語機能にしたものに近いです。ユニットテストを全面的に置き換えるものではありませんが、仕様上重要な境界値とbehaviorの対応を、実装と乖離しない形で保てます。
+
+## souther examples でモデルの穴を見つける
+
+`souther examples` はモデル自身が宣言している内容と手元のexampleを突き合わせて、どこにケースがないかを報告します。
+
+```bash
+souther examples businesstrip.sou
+```
+
+出力はbehaviorごとに4つの指標が並びます。[チュートリアル](https://souther-lang.org/tutorial/)の出張申請モデルを途中まで進めたところでは、こうなります。
+
+```
+  submitTrip               implemented   rows 2    pending 0
+    signature   out specified 2/2  observed 2/2  verified 2/2
+    partition   axes 1   single-axis 2/2
+      · not derivable: app.applicantID
+      · not derivable: app.destination
+      · not derivable: submittedAt
+    boundary    0/2
+      · no row is at submitTrip/app.estimatedExpense = 100000 (guard@32:5)
+      · no row is at submitTrip/app.estimatedExpense = 100001 (guard@32:5)
+    branch      2/2
+
+1 behavior: 1 implemented, 0 injected; 0 rows waiting for a `let`.
+adequacy: not satisfied
+```
+
+`signature` は出力の直和のどのケースについてのexample行があるかを示します。exampleが名指ししたケース、behaviorが実際に返したケース、その両方が一致したケースを別々に数えます。`partition` は入力の同値クラスのカバレッジです。`boundary` は閾値ちょうどとその隣にexample行があるかどうか、`branch` は本体のどの分岐を通ったかを示します。最後の `adequacy` が全体の判定で、`satisfied`、`not satisfied`、判断材料が足りない `undetermined` の3値です。
+
+この例の `boundary 0/2` は、10万円ちょうどと10万1円の行がないと言っています。足りない行の雛形は生成できます。
+
+```bash
+souther examples businesstrip.sou --generate --boundaries
+```
+
+コメントアウトされた行が出てくるので、期待する結果を業務ルールに従って埋めます。特定のbehaviorだけを見たいときは `--behavior` で絞り、CIでは `--strict` を使うとレポートが指摘したギャップで終了コードが非ゼロになります。
+
+`partition` の `not derivable` は、その入力位置には同値クラスが存在しないことを示します。`app.destination` は素の `String` で、値を区別するルールをモデルが何も述べていないので、分割せずにそう報告します。上限のない `Int` を勝手に0で区切ったりもしません。誰も書いていないルールを勝手に想定して「テストされていない」と言わないためです。invariantの境界は `boundary` の側に出ます。その外側の値は構築の時点で弾かれて存在しないので、区間にはなりません。
+
+裏を返すと、レポートの穴はテストの不足ではなくモデルの不足を指していることが多くあります。同値クラスが埋まらないのは、まだ決まっていない業務ケースがあるからで、境界が埋まらないのは、ルールが曖昧だからです。
+
+チュートリアルはこの進め方を通しでやります。`Status` フィールドを持った素朴なレコードから始めると、出力が単一のレコード型なので `signature not applicable` と言われる。状態を型に分けるとケースが数えられるようになり、実装を書くと `boundary` が上限の質問を出してくる。レポートのギャップを次に業務側へ聞く質問として使う、というループです。仕様書とテストケース一覧とテストコードを同期させる作業がなくなるだけでなく、何を聞き残しているかもモデルが持つことになります。
 
 ## Java プロジェクトへ組み込む
 
 `.sou` はCLIで直接 `.class` へコンパイルできます。Javaソースを生成してjavacへ渡す方式ではなく、Class-File APIで直接 `.class` を出力します。
 
 ```bash
-./souther-cli/target/souther compile example.sou -d out
+souther compile example.sou -d out
 ```
 
 実アプリケーションでは、javacのアノテーションプロセッサとして組み込むのが本線です。専用のビルドプラグインは要りません。
@@ -340,12 +385,12 @@ fake currentTime
       <path>
         <groupId>org.souther-lang</groupId>
         <artifactId>souther-compiler</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.0-rc4</version>
       </path>
       <path>
         <groupId>org.souther-lang</groupId>
         <artifactId>souther-runtime</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.0-rc4</version>
       </path>
     </annotationProcessorPaths>
     <compilerArgs><arg>-Asouther.source=${project.basedir}/src/main/souther</arg></compilerArgs>
@@ -364,11 +409,39 @@ Map<String, byte[]> linked = Compiler.compileModules(List.of(employeeSource, tri
 
 Spring Boot + jOOQ でHTTPからH2まで実際に通す例が [examplesリポジトリ](https://github.com/souther-lang/examples)にあります。境界はJavaに限らず、KotlinやClojure（Pedestal）から生成型を使う例もあります。
 
+## エディタとコマンドラインのツール
+
+VS Code拡張が[Marketplace](https://marketplace.visualstudio.com/items?itemName=souther.souther)とOpen VSXにあります。言語サーバを同梱していて、JDK 25がない環境ではJavaランタイムも自分で取得するので、インストールして `.sou` を開けば動きます。診断、アウトライン、ホバー、定義ジャンプ、参照検索、リネーム、補完、クイックフィックス、フォーマット、セマンティックトークンが使えます。
+
+言語サーバ本体は `souther-lsp.jar` として各リリースに添付されていて、stdioでLSPを話します。他のエディタからは `java -Xss4m -jar souther-lsp.jar` で起動します。スタックサイズの指定はチューニングではなく、コンパイラがサポートしている値です。
+
+言語仕様と標準ライブラリの参照も `souther` コマンドが答えます。ワークスペースを探したりjarを解凍したりしなくてよくなります。
+
+```bash
+souther doc                    # 仕様のセクションと同梱トピックの一覧
+souther doc newtype            # アンカー名でセクションを1つ
+souther doc --search decoder   # 一致した行つきの検索結果
+souther api Option             # 標準ライブラリのシグネチャ
+souther japi net.unit8.raoh.Issues   # 依存ライブラリの公開APIとjavadoc
+```
+
+`souther doc` が返すのは、そのコンパイラがビルドされた仕様そのものです。jarに同梱されていて、ディスク上のどこかを見に行くわけではありません。`souther api` は型検査器が解決したシグネチャを出します。はじめて触るなら `souther doc cli/start-here` が読む順番を教えてくれます。
+
+同じ内容をModel Context Protocolでも提供しています。`souther mcp` がstdioでMCPを話し、`doc_search`、`doc_read`、`stdlib_api`、`stdlib_api_search`、`stdlib_api_source`、`jar_api` を公開します。
+
+```json
+{ "mcpServers": { "souther": { "command": "souther", "args": ["mcp"] } } }
+```
+
+コーディングエージェントにSoutherを書かせるときは、これを登録しておくと構文を推測されずに済みます。学習データにない言語なので、仕様を引ける状態にしてあるかどうかで出てくるコードがかなり変わります。
+
 ## 意図的に持たない機能
 
 Southerは、JVM上で動く小さな汎用言語を目指しているわけではありません。業務データの構築、値の制約、状態遷移、外界への依存を一つのモデルに収めるために、必要な機能だけを持たせています。
 
-Southerにあるのは、不変の直積・直和・単位data、`List<T>`、`Map<String, T>`、`Set<T>`、optional（`T?`）、`invariant`、`match`、`let`、`if`、`guard`、リスト内包表記、newtypeの `+` / `-` 算術（結果の構築時にinvariantを再検査します）、レコードリテラルとspread、`behavior` と `depends on` / `constructs`、`>->` と値パイプ `|>`、再帰（全域性が検査され、示せないものは `partial` でオプトアウトします）、`example` とその `fake`、decoder/encoderの導出、`exposing` / `import` を持つモジュール。これだけです。
+Southerにあるのは、不変の直積・直和・単位data、`List<T>`、`Map<String, T>`、`Set<T>`、optional（`T?`）、`invariant`、`match`、`let`、`if`、`guard`、リスト内包表記、newtypeの `+` / `-` 算術（結果の構築時にinvariantを再検査します）、レコードリテラルとspread、`behavior` と `depends on` / `constructs`、`>->` と値パイプ `|>`、再帰（全域性が検査され、示せないものは `partial` でオプトアウトします。`partial` の付いていないヘルパーから `partial` なヘルパーを呼ぶことはできません）、`example` とその `fake`、decoder/encoderの導出、`exposing` / `import` を持つモジュール。
+
+組み込みの型は `Int`、`Decimal`、`String`、`Bool` と、日時の `Date`、`Time`、`DateTime`、`Instant` です。`Decimal` の丸めはスケールと `RoundingMode` の値で指定するので、`Decimal.divide` を丸め方を書かずに呼ぶことはできません。関数も値で、`List.filter(r -> matches(r), rows)` のようにラムダを渡せますし、名前の付いた関数をそのまま渡すこともできます。タプル `(a, b)` はヘルパーが複数の値を返して分解するためのもので、`Map` のキーにもなりますが、dataのフィールドやbehaviorの入出力には書けません。外部表現を持たないものは境界を越えない、という区別です。言語にあるのはこれだけです。
 
 そして次のものがありません。
 
@@ -394,4 +467,4 @@ HTTPリクエストの受信、データベースアクセス、トランザク�
 
 構文だけ見れば、代数的データ型を持つ小さな関数型言語です。ただ、自分が本当に扱いたかったのはそこではなく、誰がその値を構築できるか、どの結果が後段へ流れるか、どこから外界へ出られるか、でした。型安全なデータ定義DSLは珍しくありませんが、そこまでを1つの実行可能モデルに収めようとしているのがSoutherです。
 
-※ 正式リリースできて、始める障壁が下がったら、本記事更新します。
+※ 現在のバージョンは 0.1.0-rc4 です。正式リリース時に本記事を更新します。
